@@ -261,15 +261,22 @@ export class Liquid {
       const a = i * 2.4 + t * (0.18 + i * 0.045)
       let x, y, z = Math.sin(a) * 0.35, r = R[i]
       if (ch === 'home') {
-        const cx = m ? W * 0.25 : W * 0.4, cy = m ? -H * 0.05 : -H * 0.06
+        // на телефоне опускаем ртуть под заголовок-постер: большой шар не должен накрывать «ЖИВОЕ»
+        const cx = m ? W * 0.25 : W * 0.4, cy = m ? -H * 0.42 : -H * 0.06
         const d = (0.15 + i * 0.13) * s * (m ? 1.1 : 1.25)
-        x = cx + Math.cos(a) * d; y = cy + Math.sin(a) * d * 0.8
+        x = cx + Math.cos(a) * d; y = cy + Math.sin(a) * d * (m ? 0.5 : 0.8)
       } else if (ch === 'services') {
+        // ртутная лужа внизу слева — в свободной зоне под гигантскими словами: буквы не перекрываем
         if (i < 3) {
-          const ly = m ? [0.5, 0.22, -0.06][i] : [0.56, 0.12, -0.36][i]
-          x = (m ? -0.3 : -0.62) * W + Math.sin(t * 0.35 + i * 2.1) * (m ? 0.55 : 0.3) * W
-          y = ly * H; r = (m ? 0.32 : 0.44) * (i === 2 ? 0.85 : 1)
-        } else { const j = i - 3; x = (m ? W * 0.8 : -W * 0.1) - j * 0.03 + Math.cos(a) * 0.3; y = -H * 0.8 + Math.sin(a) * 0.25; r *= 0.7 }
+          const lx = (m ? [-0.42, -0.06, -0.24] : [-0.55, -0.18, -0.36])[i]
+          x = lx * W + Math.sin(t * 0.35 + i * 2.1) * 0.05 * W
+          y = -H * (0.92 + (i % 3) * 0.03) + Math.cos(t * 0.3 + i) * 0.03 * H
+          r = (m ? 0.26 : 0.3) * (i === 2 ? 0.85 : 1)
+        } else {
+          const j = i - 3
+          x = (m ? 0.85 : -0.35) * W - j * 0.04 * W + Math.cos(a) * 0.06 * W
+          y = -H * 0.9 + Math.sin(a) * 0.05 * H; r *= 0.7
+        }
       } else if (ch === 'works') {
         x = -W * 0.92 + (i / 8) * W * 1.84 + Math.sin(t * 0.6 + i) * 0.15
         y = (m ? 0.62 : 0.55) * H + Math.sin(t * 0.9 + i * 0.8) * 0.2 * H
@@ -328,7 +335,11 @@ export class Liquid {
     this.balls.forEach((b, i) => {
       let tx, ty, tz, tr
       if (i === 0) {
-        if (this.mouse.active) { tx = this.mouse.x; ty = this.mouse.y } else { tx = tg[0][0] - 0.9; ty = tg[0][1] + 0.5 }
+        if (this.mouse.active) { tx = this.mouse.x; ty = this.mouse.y } else {
+          // в простое шар-курсор прилипает к первой капле; на «Услугах» — внутрь лужи, чтобы не задираться к буквам
+          const oy = this.chapter === 'services' ? -0.15 : 0.5
+          tx = tg[0][0] - 0.9; ty = tg[0][1] + oy
+        }
         tz = 0.3; tr = (this.chapter === 'contact' ? 0.42 : 0.3) * (this.mobile ? 0.7 : 1)
       } else [tx, ty, tz, tr] = tg[i - 1]
       const k = i === 0 ? 14 : b.k

@@ -333,14 +333,14 @@ a{color:inherit}
 @keyframes talk{to{transform:scaleY(.4)}}
 .mood-happy .drop-mouth{d:path("M43 89 Q50 99 57 89")}
 .mood-sad .drop-mouth{d:path("M45 94 Q50 89 55 94")}
-.mascot{position:fixed;right:26px;bottom:24px;z-index:40;width:70px;height:78px;padding:0;isolation:isolate;transition:transform .45s cubic-bezier(.2,1.6,.4,1);animation:mascotIn 1s .4s cubic-bezier(.2,1.6,.4,1) both}
+.mascot{position:fixed;right:26px;bottom:24px;z-index:40;width:70px;height:78px;padding:0;isolation:isolate;transition:transform .45s cubic-bezier(.2,1.6,.4,1),opacity .3s ease;animation:mascotIn 1s .4s cubic-bezier(.2,1.6,.4,1) both}
 @keyframes mascotIn{from{transform:translateY(140%) scale(.4)}}
 .mascot::before,.mascot::after{content:'';position:absolute;z-index:-1;pointer-events:none;border-radius:50%}
 .mascot::before{left:-8%;right:-8%;top:30%;bottom:-26%;background:radial-gradient(closest-side,rgba(0,0,0,.6),rgba(0,0,0,.25) 55%,transparent)}
 .mascot::after{inset:-24%;background:radial-gradient(closest-side,rgba(184,243,255,.16),rgba(184,243,255,.06) 60%,transparent)}
 .mascot:hover{transform:scale(1.1) rotate(-6deg)}
 .mascot:active{transform:scale(.92)}
-.mascot.is-open{transform:scale(.86)}
+.mascot.is-open{transform:scale(.86);opacity:0;visibility:hidden;pointer-events:none;transition:transform .45s cubic-bezier(.2,1.6,.4,1),opacity .3s ease,visibility 0s .3s}
 .mascot-dot{position:absolute;right:2px;top:12px;width:16px;height:16px;border-radius:50%;background:#ff5a7a;border:2px solid #060606;animation:pop .4s both}
 .mascot-hint{position:fixed;right:108px;bottom:40px;z-index:40;max-width:290px;text-align:left;padding:12px 16px;border-radius:18px 18px 4px 18px;background:rgba(14,14,16,.93);border:1px solid var(--line);font-size:14px;font-weight:600;line-height:1.4;animation:hintIn .5s cubic-bezier(.2,1.5,.4,1) both;box-shadow:0 20px 40px -18px #000}
 .mascot-hint i{display:block;font-style:normal;font-size:12px;color:#b8f3ff;margin-top:6px}
@@ -363,7 +363,7 @@ a{color:inherit}
 .chat-msg.me{align-self:flex-end;background:var(--chrome);background-size:220% 100%;color:#0a0a0a;font-weight:700;border-bottom-right-radius:6px}
 .chat-msg.typing{display:flex;gap:4px;padding:14px 16px}
 .chat-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;animation:pop .35s both}
-.chat-chips button,.chat-chips a{font-size:13px;font-weight:700;padding:8px 13px;border-radius:999px;border:1px solid rgba(236,235,230,.3);text-decoration:none;transition:background .2s,color .2s,transform .3s cubic-bezier(.2,1.6,.4,1)}
+.chat-chips button,.chat-chips a{font-size:13px;font-weight:700;padding:8px 13px;border-radius:999px;border:1px solid rgba(236,235,230,.3);text-decoration:none;white-space:nowrap;transition:background .2s,color .2s,transform .3s cubic-bezier(.2,1.6,.4,1)}
 .chat-chips button:hover,.chat-chips a:hover{background:var(--ink);color:#0a0a0a;transform:translateY(-2px)}
 .chat-chips .faq{border-style:dashed;color:var(--mute);font-weight:600}
 .chat-summary{display:grid;gap:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;font-size:13.5px;animation:pop .35s both}
@@ -395,8 +395,8 @@ a{color:inherit}
 
 @media (max-width:760px), (orientation:portrait) and (max-width:1100px){ /* MOBILE_MQ — синхронно с src/mq.js */
   .top{padding:14px 16px}
-  .nav{position:fixed;left:12px;bottom:14px;margin:0;gap:2px;padding:4px}
-  .nav button{font-size:0;padding:0;width:34px;height:34px;justify-content:center;align-items:center}
+  .nav{position:fixed;left:12px;right:12px;bottom:calc(10px + env(safe-area-inset-bottom));margin:0;gap:0;padding:4px;justify-content:space-between}
+  .nav button{font-size:0;padding:0;flex:1 1 auto;width:auto;height:44px;justify-content:center;align-items:center}
   .nav button i{font-size:11px;opacity:1;display:inline}
   .top-cta{padding:8px 14px;font-size:13px}
   .fx-toggle{margin-left:auto;margin-right:8px;padding:7px 10px 7px 8px}
@@ -463,7 +463,7 @@ a{color:inherit}
   .chat-head{padding-top:max(14px,env(safe-area-inset-top))}
   .chat-input{padding-bottom:max(12px,env(safe-area-inset-bottom))}
 }
-@media (max-width:359px){.nav button{width:30px;height:30px}.nav button i{font-size:10px}.btn.big{font-size:14px;padding:0 10px}}
+@media (max-width:359px){.nav button{height:40px}.nav button i{font-size:10px}.btn.big{font-size:14px;padding:0 10px}}
 /* статичный режим без WebGL */
 .static-mode .touch-hint{display:none}
 .has-cursor .chat,.has-cursor .chat *{cursor:auto}.has-cursor .chat button,.has-cursor .chat a{cursor:pointer}.has-cursor .chat input{cursor:text}
