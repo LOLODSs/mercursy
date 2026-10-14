@@ -1,0 +1,34 @@
+/* Telegram-чат: общий для демо бота и демо «Стройка» (подключается и на demo.html) */
+.tg{--tgbg:#0e1621;width:min(380px,100%);height:min(640px,100%);display:flex;flex-direction:column;border-radius:34px;overflow:hidden;background:var(--tgbg);border:1px solid rgba(255,255,255,.12);box-shadow:0 40px 90px -30px #000,0 0 0 8px #15171b,0 0 0 9px rgba(255,255,255,.12);font:14px/1.35 -apple-system,'Segoe UI',Roboto,system-ui,sans-serif;color:#f5f5f5;text-align:left}
+.tg-head{display:flex;gap:10px;align-items:center;padding:14px 16px;background:#17212b;border-bottom:1px solid #0b1118}
+.tg-back{font-size:26px;line-height:1;color:#6ab3f3;margin-right:2px}
+.tg-ava{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:13px;background:linear-gradient(135deg,#f6a,#fb5);color:#fff}
+.tg-head b{display:block;font-size:15px}.tg-head small{font-size:12.5px;color:#7f91a4}
+.tg-body{flex:1;overflow-y:auto;padding:12px 12px 6px;display:flex;flex-direction:column;gap:6px;scrollbar-width:none;
+  background:radial-gradient(circle at 20% 20%,rgba(106,179,243,.08),transparent 40%),radial-gradient(circle at 80% 70%,rgba(255,102,170,.06),transparent 40%),var(--tgbg)}
+.tg-body::-webkit-scrollbar{display:none}
+.tg-date{align-self:center;font-size:12px;padding:3px 10px;border-radius:999px;background:rgba(0,0,0,.35);color:#cfd8e2;margin:4px 0}
+.tg-msg{max-width:82%;padding:7px 11px 6px;border-radius:15px;white-space:pre-line;position:relative;animation:pop .35s cubic-bezier(.2,1.5,.4,1) both}
+.tg-msg i{font-style:normal;font-size:11px;color:rgba(255,255,255,.45);margin-left:8px;float:right;margin-top:6px}
+.tg-msg.bot{align-self:flex-start;background:#182533;border-bottom-left-radius:5px}
+.tg-msg.me{align-self:flex-end;background:#2b5278;border-bottom-right-radius:5px}
+.tg-msg.me i{color:#7fc5ff}
+.tg-msg.typing{display:flex;gap:4px;padding:12px 14px}
+.tg-msg.typing span,.chat-msg.typing span{width:7px;height:7px;border-radius:50%;background:#8aa0b5;animation:bounce 1s infinite}
+.tg-msg.typing span:nth-child(2),.chat-msg.typing span:nth-child(2){animation-delay:.15s}
+.tg-msg.typing span:nth-child(3),.chat-msg.typing span:nth-child(3){animation-delay:.3s}
+@keyframes bounce{0%,60%,100%{transform:none;opacity:.5}30%{transform:translateY(-4px);opacity:1}}
+@keyframes pop{from{transform:scale(.6) translateY(10px);opacity:0}}
+.tg-kb{display:grid;grid-template-columns:1fr 1fr;gap:5px;max-width:92%;animation:pop .35s cubic-bezier(.2,1.5,.4,1) both}
+.tg-kb.col{grid-template-columns:1fr}
+.tg-kb button{padding:9px 10px;border-radius:10px;background:rgba(56,74,96,.75);color:#fff;font:600 13.5px/1.2 inherit;transition:background .2s,transform .2s}
+.tg-kb button:hover{background:#3f6a96}
+.tg-kb button:active{transform:scale(.97)}
+.tg-kb.hint button{animation:hint 1.4s ease-in-out infinite}
+.tg-kb.hint button:nth-child(2){animation-delay:.15s}.tg-kb.hint button:nth-child(3){animation-delay:.3s}
+@keyframes hint{50%{background:#4d82b8;box-shadow:0 0 0 3px rgba(106,179,243,.25)}}
+.tg-input{display:flex;align-items:center;gap:10px;padding:10px 14px;background:#17212b;color:#6d7f92;font-size:14px}
+.tg-menu{padding:6px 10px;border-radius:9px;background:#2b5278;color:#fff;font-weight:600;font-size:13px}
+.tg.mini{width:100%;height:100%;border-radius:0;border:0;box-shadow:none;font-size:12px}
+.tg.mini .tg-head{padding:9px 12px}.tg.mini .tg-ava{width:30px;height:30px;font-size:11px}.tg.mini .tg-head b{font-size:13px}
+.tg.mini .tg-kb button{font-size:11.5px;padding:7px 8px}.tg.mini .tg-input{display:none}.tg.mini .tg-back{display:none}

@@ -1,0 +1,27 @@
+{
+  "name": "mercury-portfolio",
+  "version": "1.0.0",
+  "description": "Liquid-портфолио vaganito",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vite",
+    "check": "node scripts/check-placeholders.js",
+    "prebuild": "node scripts/check-placeholders.js",
+    "build": "vite build",
+    "preview": "vite preview",
+    "tg:chat-id": "node scripts/tg-chat-id.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@fontsource/manrope": "^5.3.0",
+    "@fontsource/oswald": "^5.3.0",
+    "preact": "^11.0.0"
+  },
+  "devDependencies": {
+    "@preact/preset-vite": "^2.10.6",
+    "vite": "^8.3.2"
+  }
+}
