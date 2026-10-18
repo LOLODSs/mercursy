@@ -586,38 +586,83 @@ function Works({ onOpen, covered }) {
 
 function Case({ data, onClose, onContact, onNext }) {
   const ref = useRef(null)
-  useFocusTrap(ref, true, onClose)
-  const [loadInteractive, setLoadInteractive] = useState(!isMobile())
+  const isMob = isMobile()
+  const isInteractive = Boolean(data.iframe || data.demo)
+  const [fullscreenInteractive, setFullscreenInteractive] = useState(isMob && isInteractive)
+
+  useFocusTrap(ref, true, fullscreenInteractive ? () => setFullscreenInteractive(false) : onClose)
 
   useEffect(() => {
     ref.current?.scrollTo({ top: 0, behavior: 'instant' })
     const info = ref.current?.querySelector('.case-info')
     info?.scrollTo({ top: 0, behavior: 'instant' })
-    setLoadInteractive(!isMobile())
+    setFullscreenInteractive(isMobile() && Boolean(data.iframe || data.demo))
   }, [data.idx])
 
   const empty = !data.title
   return (
-    <div ref={ref} className={`case ${data.demo ? 'has-demo' : ''} ${data.iframe ? 'has-iframe' : ''}`} role="dialog" aria-modal="true" aria-label={empty ? 'Свободный слот' : data.title} style={{ '--ox': `${data.ox}px`, '--oy': `${data.oy}px` }} key={data.idx}>
+    <div ref={ref} className={`case ${data.demo ? 'has-demo' : ''} ${data.iframe ? 'has-iframe' : ''} ${fullscreenInteractive && isMob && isInteractive ? 'is-fullscreen-interactive' : ''}`} role="dialog" aria-modal="true" aria-label={empty ? 'Свободный слот' : data.title} style={{ '--ox': `${data.ox}px`, '--oy': `${data.oy}px` }} key={data.idx}>
       <button className="case-close" onClick={onClose} aria-label="Закрыть"><svg width="18" height="18" viewBox="0 0 18 18"><path d="M3 3l12 12M15 3L3 15" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" /></svg></button>
       <div className={`case-media ${data.demo ? `demo-${data.demo}` : ''} ${data.iframe ? 'is-iframe' : ''}`}>
+        {isMob && isInteractive && fullscreenInteractive && (
+          <div className="interactive-exit-bar">
+            <button
+              type="button"
+              className="interactive-exit-btn"
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                setFullscreenInteractive(false)
+              }}
+              aria-label="Выйти из интерактива"
+            >
+              <svg width="18" height="18" viewBox="0 0 18 18">
+                <path d="M3 3l12 12M15 3L3 15" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+              </svg>
+              <span>Выйти из интерактива</span>
+            </button>
+          </div>
+        )}
         {data.iframe ? (
-          loadInteractive ? (
-            <>
-              <iframe src={data.iframe} title={data.title} className="case-iframe" />
-              <span className="case-try">{data.tryLabel || 'Интерактивный проект — покрути и потыкай ↓'}</span>
-            </>
-          ) : (
+          isMob && !fullscreenInteractive ? (
             <div className="case-iframe-preview">
               <img src={data.image || data.cover} alt={data.title} />
-              <button className="btn chrome case-launch-btn" onClick={() => setLoadInteractive(true)}>
-                <span>▶ Запустить интерактив / 3D</span>
+              <button type="button" className="btn chrome case-launch-btn" onClick={() => setFullscreenInteractive(true)}>
+                <span>▶ Открыть 3D на весь экран</span>
               </button>
-              <span className="case-try">Нажмите для загрузки живой 3D-версии проекта</span>
+              <span className="case-try">Нажмите, чтобы развернуть интерактив на весь экран</span>
             </div>
+          ) : (
+            <>
+              <iframe
+                src={data.iframe}
+                title={data.title}
+                className="case-iframe"
+                allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
+              />
+              {!isMob && <span className="case-try">{data.tryLabel || 'Интерактивный проект — покрути и потыкай ↓'}</span>}
+            </>
           )
-        ) : data.demo ? <Demo kind={data.demo} /> : data.video ? <video src={data.video} poster={data.image || data.cover} autoPlay muted loop playsInline controls /> : <img src={data.image || data.cover} alt="" />}
-        {data.demo && <span className="case-try">{data.tryLabel || 'Интерактивный проект — потыкай ↓'}</span>}
+        ) : data.demo ? (
+          isMob && !fullscreenInteractive ? (
+            <div className="case-iframe-preview">
+              <img src={data.image || data.cover} alt={data.title} />
+              <button type="button" className="btn chrome case-launch-btn" onClick={() => setFullscreenInteractive(true)}>
+                <span>▶ Запустить интерактив на весь экран</span>
+              </button>
+              <span className="case-try">Нажмите, чтобы протестировать интерактив на весь экран</span>
+            </div>
+          ) : (
+            <>
+              <Demo kind={data.demo} />
+              {!isMob && <span className="case-try">{data.tryLabel || 'Интерактивный проект — потыкай ↓'}</span>}
+            </>
+          )
+        ) : data.video ? (
+          <video src={data.video} poster={data.image || data.cover} autoPlay muted loop playsInline controls />
+        ) : (
+          <img src={data.image || data.cover} alt="" />
+        )}
       </div>
       <div className="case-info">
         <div className="case-meta"><span>{String(data.idx + 1).padStart(2, '0')}</span><span>{data.type}</span>{data.year && <span>{data.year}</span>}<Badge on={data.isDemo} /></div>

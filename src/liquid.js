@@ -257,7 +257,7 @@ export class Liquid {
     this.fr.hold = performance.now() + 250
     this.chapter = chapter
     this.layout?.setChapter(this.chapter)
-    this.splash(this.mobile ? 4.5 : 2.5)
+    this.splash(this.mobile ? 1.6 : 2.5)
   }
   finish() {
     const t = this.trans; if (!t) return
@@ -277,8 +277,14 @@ export class Liquid {
   setMouse(cx, cy) {
     if (this.layout?.current?.bounded && !this.mobile) { this.mouse.active = false; return }
     const W = H * innerWidth / innerHeight
-    this.mouse.x = (cx / innerWidth * 2 - 1) * W
-    this.mouse.y = -(cy / innerHeight * 2 - 1) * H
+    let mx = (cx / innerWidth * 2 - 1) * W
+    let my = -(cy / innerHeight * 2 - 1) * H
+    if (this.mobile) {
+      mx = Math.max(-W * 0.82, Math.min(W * 0.82, mx))
+      my = Math.max(-H * 0.68, Math.min(H * 0.76, my))
+    }
+    this.mouse.x = mx
+    this.mouse.y = my
     this.mouse.active = true
   }
   setMouseActive(active) {
@@ -286,7 +292,8 @@ export class Liquid {
   }
   splash(power = 5) {
     if (this.layout?.current?.bounded && !this.mobile) return
-    this.balls.forEach((b, i) => { if (!i) return; const a = Math.random() * 6.283; b.vx += Math.cos(a) * power; b.vy += Math.sin(a) * power; b.vz += (Math.random() - 0.5) * power })
+    const p = this.mobile ? Math.min(power, 2.0) : power
+    this.balls.forEach((b, i) => { if (!i) return; const a = Math.random() * 6.283; b.vx += Math.cos(a) * p; b.vy += Math.sin(a) * p; b.vz += (Math.random() - 0.5) * p })
   }
   targets(t) {
     const layout = this.layout?.current
@@ -301,47 +308,55 @@ export class Liquid {
       const a = i * 2.4 + t * (0.18 + i * 0.045)
       let x, y, z = Math.sin(a) * 0.35, r = R[i]
       if (ch === 'home') {
-        // на телефоне ртуть парит в свободном окне между «ЖИВОЕ» и текстом описания
-        const cx = m ? W * 0.26 : W * 0.4, cy = m ? -H * 0.04 : -H * 0.06
-        const d = (0.15 + i * 0.13) * s * (m ? 0.65 : 1.25)
+        // на телефоне ртуть парит точно по центру в свободном окне между «ЖИВОЕ» и текстом описания
+        const cx = m ? 0 : W * 0.4, cy = m ? -H * 0.05 : -H * 0.06
+        const d = (0.15 + i * 0.13) * s * (m ? 0.6 : 1.25)
         x = cx + Math.cos(a) * d; y = cy + Math.sin(a) * d * (m ? 0.35 : 0.8)
-        r *= m ? 0.6 : 1
+        r *= m ? 0.65 : 1
       } else if (ch === 'services') {
-        // ртутная лужа внизу слева — в свободной зоне под гигантскими словами: буквы не перекрываем
-        if (i < 3) {
-          const lx = (m ? [-0.42, -0.06, -0.24] : [-0.55, -0.18, -0.36])[i]
-          x = lx * W + Math.sin(t * 0.35 + i * 2.1) * 0.05 * W
-          y = -H * (0.92 + (i % 3) * 0.03) + Math.cos(t * 0.3 + i) * 0.03 * H
-          r = (m ? 0.26 : 0.3) * (i === 2 ? 0.85 : 1)
+        if (m) {
+          // на телефоне ртуть парит в верхней свободной зоне вокруг контурного слова «БОТЫ»
+          const cx = 0, cy = H * 0.36
+          const d = (0.16 + (i % 4) * 0.12) * s * 0.8
+          x = cx + Math.cos(a) * d * 1.3; y = cy + Math.sin(a) * d * 0.45
+          r = (0.28 + (i % 3) * 0.1) * s * 0.85
         } else {
-          const j = i - 3
-          x = (m ? 0.85 : -0.35) * W - j * 0.04 * W + Math.cos(a) * 0.06 * W
-          y = -H * 0.9 + Math.sin(a) * 0.05 * H; r *= 0.7
+          if (i < 3) {
+            const lx = [-0.55, -0.18, -0.36][i]
+            x = lx * W + Math.sin(t * 0.35 + i * 2.1) * 0.05 * W
+            y = -H * (0.92 + (i % 3) * 0.03) + Math.cos(t * 0.3 + i) * 0.03 * H
+            r = 0.3 * (i === 2 ? 0.85 : 1)
+          } else {
+            const j = i - 3
+            x = -0.35 * W - j * 0.04 * W + Math.cos(a) * 0.06 * W
+            y = -H * 0.9 + Math.sin(a) * 0.05 * H; r *= 0.7
+          }
         }
       } else if (ch === 'works') {
-        // на телефоне капли мягко текут под словом «РАБОТЫ» за карточками кейсов
-        x = -W * 0.92 + (i / 8) * W * 1.84 + Math.sin(t * 0.6 + i) * 0.15
-        y = (m ? -0.15 : 0.55) * H + Math.sin(t * 0.8 + i) * (m ? 0.04 : 0.2) * H
-        r = (0.16 + ((i * 37) % 9) / 9 * 0.24) * s * (m ? 0.55 : 1.3)
+        // на телефоне капли мягко текут под/вокруг слова «РАБОТЫ» НАД карточками кейсов
+        x = -W * 0.85 + (i / 8) * W * 1.7 + Math.sin(t * 0.6 + i) * (m ? 0.08 : 0.15)
+        y = (m ? 0.52 : 0.55) * H + Math.sin(t * 0.8 + i) * (m ? 0.06 : 0.2) * H
+        r = (0.16 + ((i * 37) % 9) / 9 * 0.24) * s * (m ? 0.6 : 1.3)
       } else if (ch === 'process') {
-        // на телефоне ртуть располагается в просвете под «РАБОТАЮ» над шагами процесса
-        const cx = m ? W * 0.55 : W * 0.62, cy = m ? H * 0.14 : H * 0.45
-        const d = (0.2 + i * 0.09) * s * (m ? 0.7 : 1)
-        x = cx + Math.cos(a * 0.7) * d * (m ? 0.8 : 1.6); y = cy + Math.sin(a * 0.7) * d * 0.4; r *= m ? 0.36 : 0.8
+        // на телефоне ртуть располагается в верхней зоне вокруг «КАК Я РАБОТАЮ»
+        const cx = m ? 0 : W * 0.62, cy = m ? H * 0.40 : H * 0.45
+        const d = (0.2 + i * 0.09) * s * (m ? 0.65 : 1)
+        x = cx + Math.cos(a * 0.7) * d * (m ? 0.9 : 1.6); y = cy + Math.sin(a * 0.7) * d * 0.4; r *= m ? 0.42 : 0.8
       } else if (ch === 'reviews') {
-        const cx = m ? W * 0.45 : W * 0.66, cy = m ? H * 0.2 : H * 0.36
+        // на телефоне ртуть парит в верхней зоне вокруг заголовка
+        const cx = m ? 0 : W * 0.66, cy = m ? H * 0.42 : H * 0.36
         const aa = i / 9 * 6.283 + t * 0.2
-        x = cx + Math.cos(aa) * 0.45 * s * (m ? 1.6 : 1); y = cy + Math.sin(aa) * 0.3 * s * (m ? 0.4 : 1); r *= (i % 3 ? 0.6 : 0.95) * (m ? 0.55 : 1)
+        x = cx + Math.cos(aa) * 0.36 * s * (m ? 1.1 : 1); y = cy + Math.sin(aa) * 0.25 * s * (m ? 0.5 : 1); r *= (i % 3 ? 0.6 : 0.95) * (m ? 0.58 : 1)
       } else if (ch === 'about') {
-        // на телефоне шар компактно парит справа в чистой зоне: цифры 40+, 24/7 и теги остаются кристально чистыми
-        const cx = m ? W * 0.52 : W * 0.48, cy = m ? H * 0.14 : 0
-        const rr = (m ? 0.3 : 0.85) * s
+        // на телефоне шар компактно парит в верхней свободной зоне вокруг заголовка
+        const cx = m ? 0 : W * 0.48, cy = m ? H * 0.42 : 0
+        const rr = (m ? 0.34 : 0.85) * s
         const aa = i / 9 * 6.283 + t * 0.25
-        x = cx + Math.cos(aa) * rr * (m ? 0.9 : 1.2); y = cy + Math.sin(aa) * rr; z = Math.sin(aa * 2 + t) * 0.4; r *= m ? 0.38 : 0.75
+        x = cx + Math.cos(aa) * rr * (m ? 0.9 : 1.2); y = cy + Math.sin(aa) * rr * (m ? 0.6 : 1); z = Math.sin(aa * 2 + t) * 0.4; r *= m ? 0.44 : 0.75
       } else {
-        // контакт: парит в середине между заголовком и формой/кнопками
-        const cx = m ? W * 0.36 : W * 0.52, cy = m ? H * 0.04 : H * 0.05
-        x = cx + Math.cos(a) * 0.32 * s * (m ? 0.65 : 1); y = cy + Math.sin(a) * 0.28 * s * (m ? 0.65 : 1); r = (0.42 + (i % 3) * 0.1) * s * (m ? 0.45 : 1)
+        // контакт: парит в свободной зоне между заголовком и кнопками
+        const cx = m ? 0 : W * 0.52, cy = m ? H * 0.26 : H * 0.05
+        x = cx + Math.cos(a) * 0.3 * s * (m ? 0.75 : 1); y = cy + Math.sin(a) * 0.26 * s * (m ? 0.65 : 1); r = (0.42 + (i % 3) * 0.1) * s * (m ? 0.48 : 1)
       }
       out.push([x, y, z, r])
     }
@@ -381,8 +396,8 @@ export class Liquid {
       let tx, ty, tz, tr
       if (i === 0) {
         if (this.mouse.active) { tx = this.mouse.x; ty = this.mouse.y } else {
-          // в простое шар-курсор прилипает к первой капле; на «Услугах» — внутрь лужи, чтобы не задираться к буквам
-          const oy = this.chapter === 'services' ? -0.15 : (this.mobile ? 0 : 0.5)
+          // в простое шар-курсор прилипает к первой капле; на десктопе «Услугах» — внутрь лужи
+          const oy = !this.mobile && this.chapter === 'services' ? -0.15 : (this.mobile ? 0 : 0.5)
           tx = this.mobile ? tg[0][0] : tg[0][0] - 0.9; ty = tg[0][1] + oy
         }
         tz = 0.3; tr = (this.chapter === 'contact' ? 0.42 : 0.3) * (this.mobile ? 0.7 : 1)
@@ -398,6 +413,16 @@ export class Liquid {
       b.x += b.vx * dt; b.y += b.vy * dt; b.z += b.vz * dt
       b.r += (tr - b.r) * Math.min(1, dt * 3)
       if (this.layout?.current?.bounded && !this.mobile) constrainBall(b, this.layout.current.bounds, this.shapeScale)
+      if (this.mobile) {
+        const W = H * innerWidth / innerHeight
+        const maxW = W * 0.82
+        const minY = -H * 0.66
+        const maxY = H * 0.76
+        if (b.x < -maxW) { b.x = -maxW; b.vx = Math.abs(b.vx) * 0.25 }
+        else if (b.x > maxW) { b.x = maxW; b.vx = -Math.abs(b.vx) * 0.25 }
+        if (b.y < minY) { b.y = minY; b.vy = Math.abs(b.vy) * 0.25 }
+        else if (b.y > maxY) { b.y = maxY; b.vy = -Math.abs(b.vy) * 0.25 }
+      }
       U[i * 4] = b.x; U[i * 4 + 1] = b.y; U[i * 4 + 2] = b.z; U[i * 4 + 3] = Math.max(0.01, b.r)
     })
     this.snapScene = false

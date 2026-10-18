@@ -608,6 +608,20 @@ a{color:inherit}
   .case.has-demo .case-media{height:auto;min-height:0;padding:84px var(--gutter) 24px}
   .case.has-iframe .case-media{padding-top:76px;height:76svh;min-height:420px;display:block}
   .case.has-iframe .case-iframe{height:100%}
+  .case.is-fullscreen-interactive{overflow:hidden!important}
+  .case.is-fullscreen-interactive .case-media{position:fixed!important;inset:0!important;width:100vw!important;height:100dvh!important;max-height:none!important;padding:0!important;z-index:9999!important;background:#000!important;display:flex!important;align-items:center!important;justify-content:center!important}
+  .case.is-fullscreen-interactive .case-iframe{width:100vw!important;height:100dvh!important;max-width:100vw!important;max-height:100dvh!important;border:0!important}
+  .case.is-fullscreen-interactive .case-info,
+  .case.is-fullscreen-interactive .case-close,
+  .case.is-fullscreen-interactive .case-try{display:none!important}
+  .case.is-fullscreen-interactive .demo-bot .tg{height:calc(100dvh - 84px)!important;max-height:none!important;margin-top:auto;margin-bottom:12px}
+  .case.is-fullscreen-interactive .demo-site .site{height:calc(100dvh - 84px)!important;max-height:none!important;margin-top:auto;margin-bottom:12px}
+  .case.is-fullscreen-interactive .demo-build{padding:76px 16px 20px!important;height:100dvh;overflow-y:auto}
+  .case.is-fullscreen-interactive .flow{padding:76px 16px 20px!important;max-height:100dvh;overflow-y:auto}
+  .interactive-exit-bar{position:fixed;top:calc(16px + env(safe-area-inset-top));left:0;right:0;display:flex;justify-content:center;align-items:center;z-index:10002;pointer-events:none}
+  .interactive-exit-btn{pointer-events:auto;display:inline-flex;align-items:center;gap:8px;background:rgba(18,18,24,.92);color:#fff;border:1px solid rgba(255,255,255,.24);border-radius:999px;padding:11px 22px;font-size:14px;font-weight:600;letter-spacing:-.01em;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);box-shadow:0 10px 32px rgba(0,0,0,.8),0 0 0 1px rgba(255,255,255,.1);cursor:pointer;transition:transform .15s ease,background .15s ease}
+  .interactive-exit-btn:active{transform:scale(.95);background:rgba(36,36,48,.96)}
+  .interactive-exit-btn svg{flex-shrink:0}
   .case-try{top:calc(16px + env(safe-area-inset-top));left:var(--gutter);right:80px;transform:none;max-width:none;white-space:normal;font-size:11px;line-height:1.4;border-radius:12px;padding:8px 10px;animation:none}
   .case.has-demo .demo-bot .tg{height:560px;max-height:80svh;min-height:320px}
   .case.has-demo .demo-site .site{height:560px;max-height:80svh;min-height:320px}
