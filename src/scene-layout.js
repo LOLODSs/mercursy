@@ -24,20 +24,7 @@ function subtract(a,b) {
 }
 function readLayout(chapter) {
   const w = innerWidth, h = innerHeight, compact = isMobile()
-  if (compact) return { bounded: false, compact: true, bounds: { x: 0, y: 0, width: w, height: h }, clip: { x: 0, y: 0, width: w, height: h } }
-  if (w >= 2000 && h >= 1000) return { bounded: false, compact: false }
-  const [x, y, width, height] = DESKTOP[chapter] || DESKTOP.home
-  let bounds = { x: x * w, y: y * h, width: width * w, height: height * h }
-  // Custom content, fonts and varying laptop heights must not invade the scene.
-  let free = [bounds]
-  for (const el of document.querySelectorAll('.top,.counter,.progress,.mascot,.home-foot,.svc,.reel,.proc,.revs,.about,.contact,.copy')) {
-    if (getComputedStyle(el).display === 'none') continue
-    const b = box(el.getBoundingClientRect()); b.x -= 10; b.y -= 10; b.width += 20; b.height += 20
-    free = free.flatMap(r => subtract(r, b))
-  }
-  bounds = free.sort((a, b) => b.width * b.height - a.width * a.height)[0] || { x: 0, y: 0, width: 0, height: 0 }
-  const clip = intersect(bounds, { x: 0, y: 0, width: w, height: h })
-  return { bounded: true, compact, bounds, clip }
+  return { bounded: false, compact, bounds: { x: 0, y: 0, width: w, height: h }, clip: { x: 0, y: 0, width: w, height: h } }
 }
 
 export class SceneLayout {

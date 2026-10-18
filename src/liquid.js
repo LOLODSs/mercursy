@@ -291,13 +291,10 @@ export class Liquid {
     this.mouse.active = !!active
   }
   splash(power = 5) {
-    if (this.layout?.current?.bounded && !this.mobile) return
     const p = this.mobile ? Math.min(power, 2.0) : power
     this.balls.forEach((b, i) => { if (!i) return; const a = Math.random() * 6.283; b.vx += Math.cos(a) * p; b.vy += Math.sin(a) * p; b.vz += (Math.random() - 0.5) * p })
   }
   targets(t) {
-    const layout = this.layout?.current
-    if (layout?.bounded && !this.mobile) { const geometry = mercuryGeometry(layout.bounds, t, this.chapter); this.shapeScale = geometry.scale; return geometry.targets }
     this.shapeScale = 1
     const asp = innerWidth / innerHeight, W = H * asp, m = this.mobile
     const s = m ? 0.62 : Math.min(1, Math.max(0.7, asp / 1.6))
@@ -404,7 +401,6 @@ export class Liquid {
       } else {
         [tx, ty, tz, tr] = tg[i - 1]
       }
-      if (this.layout?.current?.bounded && !this.mobile && i === 0) { [tx, ty, tz, tr] = tg[0]; tr *= 0.45 }
       if (this.snapScene) { b.x = tx; b.y = ty; b.z = tz; b.r = tr; b.vx = b.vy = b.vz = 0 }
       const k = i === 0 ? 14 : b.k
       b.vx += (tx - b.x) * k * dt; b.vy += (ty - b.y) * k * dt; b.vz += (tz - b.z) * k * dt
@@ -412,7 +408,6 @@ export class Liquid {
       b.vx *= damp; b.vy *= damp; b.vz *= damp
       b.x += b.vx * dt; b.y += b.vy * dt; b.z += b.vz * dt
       b.r += (tr - b.r) * Math.min(1, dt * 3)
-      if (this.layout?.current?.bounded && !this.mobile) constrainBall(b, this.layout.current.bounds, this.shapeScale)
       if (this.mobile) {
         const W = H * innerWidth / innerHeight
         const maxW = W * 0.82
