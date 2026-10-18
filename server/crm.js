@@ -11,7 +11,7 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 
-const DATA_DIR = 'data'
+const DATA_DIR = process.env.VERCEL ? '/tmp' : 'data'
 const FILE_PATH = join(DATA_DIR, 'leads.json')
 
 function ensureStorage() {
