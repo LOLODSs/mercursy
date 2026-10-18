@@ -381,6 +381,7 @@ function Services({ openType }) {
 
 function Works({ onOpen, covered }) {
   const reel = useRef(null)
+  const [activeIdx, setActiveIdx] = useState(0)
   // какие карточки сейчас видны в ленте — живые мини-демо крутятся только у них
   const [vis, setVis] = useState(() => new Set())
   useEffect(() => {
@@ -390,6 +391,35 @@ function Works({ onOpen, covered }) {
     }), { root: reel.current, rootMargin: '0px 120px' })
     reel.current.querySelectorAll('.card').forEach((c) => io.observe(c))
     return () => io.disconnect()
+  }, [])
+  useEffect(() => {
+    const el = reel.current
+    if (!el) return
+    let raf = 0
+    const onScrollActive = () => {
+      if (raf) return
+      raf = requestAnimationFrame(() => {
+        raf = 0
+        const cards = el.querySelectorAll('.card')
+        if (!cards.length) return
+        const scrollCenter = el.scrollLeft + el.clientWidth / 2
+        let closest = 0, minDist = Infinity
+        cards.forEach((c, idx) => {
+          const center = c.offsetLeft + c.offsetWidth / 2
+          const dist = Math.abs(scrollCenter - center)
+          if (dist < minDist) {
+            minDist = dist
+            closest = idx
+          }
+        })
+        setActiveIdx(closest)
+      })
+    }
+    el.addEventListener('scroll', onScrollActive, { passive: true })
+    return () => {
+      el.removeEventListener('scroll', onScrollActive)
+      cancelAnimationFrame(raf)
+    }
   }, [])
   useEffect(() => {
     const el = reel.current
@@ -527,12 +557,42 @@ function Works({ onOpen, covered }) {
       }
     }
 
+    // Drag на touch: отличаем свайп от клика, чтобы при свайпе не открывался попап кейса
+    let touchStart = null
+    let touchMoved = false
+    const onTouchStart = (e) => {
+      if (!e.touches?.[0]) return
+      touchStart = { x: e.touches[0].clientX, y: e.touches[0].clientY }
+      touchMoved = false
+    }
+    const onTouchMove = (e) => {
+      if (!touchStart || !e.touches?.[0]) return
+      const dx = e.touches[0].clientX - touchStart.x
+      const dy = e.touches[0].clientY - touchStart.y
+      if (Math.hypot(dx, dy) > 8) {
+        touchMoved = true
+        el.dataset.dragged = '1'
+      }
+    }
+    const onTouchEnd = () => {
+      if (touchMoved) {
+        el.dataset.dragged = '1'
+        setTimeout(() => delete el.dataset.dragged, 140)
+      }
+      touchStart = null
+      touchMoved = false
+    }
+
     el.addEventListener('wheel', onWheel, { passive: false })
     el.addEventListener('scroll', onScroll, { passive: true })
     el.addEventListener('pointerdown', pd)
     addEventListener('pointermove', pm)
     addEventListener('pointerup', pu)
     addEventListener('pointercancel', pu)
+    el.addEventListener('touchstart', onTouchStart, { passive: true })
+    el.addEventListener('touchmove', onTouchMove, { passive: true })
+    el.addEventListener('touchend', onTouchEnd, { passive: true })
+    el.addEventListener('touchcancel', onTouchEnd, { passive: true })
 
     return () => {
       cancelAnimationFrame(smoothRaf)
@@ -542,8 +602,25 @@ function Works({ onOpen, covered }) {
       removeEventListener('pointermove', pm)
       removeEventListener('pointerup', pu)
       removeEventListener('pointercancel', pu)
+      el.removeEventListener('touchstart', onTouchStart)
+      el.removeEventListener('touchmove', onTouchMove)
+      el.removeEventListener('touchend', onTouchEnd)
+      el.removeEventListener('touchcancel', onTouchEnd)
     }
   }, [])
+
+  const scrollSlide = (dir) => {
+    const el = reel.current
+    if (!el) return
+    const cards = el.querySelectorAll('.card')
+    const next = Math.max(0, Math.min(cards.length - 1, activeIdx + dir))
+    const target = cards[next]
+    if (target) {
+      const targetLeft = target.offsetLeft - (el.clientWidth - target.offsetWidth) / 2
+      el.scrollTo({ left: targetLeft, behavior: 'smooth' })
+    }
+  }
+
   return (
     <>
       <h2 className="sr">Работы</h2>
@@ -554,7 +631,7 @@ function Works({ onOpen, covered }) {
             <div key={i} data-i={i} className={`card ${empty ? 'empty' : ''}`} style={{ animationDelay: `${i * 70}ms` }} role="button" tabIndex={0}
               aria-label={empty ? `Свободный слот ${i + 1}` : `Открыть кейс ${p.title}`}
               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); onOpen({ ...p, idx: i, ox: innerWidth / 2, oy: innerHeight / 2 }) } }}
-              onClick={(e) => { if (reel.current.dataset.dragged) return; onOpen({ ...p, idx: i, ox: e.clientX, oy: e.clientY }) }}
+              onClick={(e) => { if (reel.current?.dataset.dragged) return; onOpen({ ...p, idx: i, ox: e.clientX, oy: e.clientY }) }}
               data-cursor={empty ? 'слот' : (p.demo || p.iframe) ? 'потыкать' : 'открыть'}>
               <div className={`card-media ${(p.demo || p.iframe || p.video) ? 'is-demo' : ''} ${p.demo && (covered || !vis.has(i)) ? 'paused' : ''}`}>
                 {isMobile() ? (
@@ -580,6 +657,15 @@ function Works({ onOpen, covered }) {
           )
         })}
         <div className="reel-end">← тяни / листай вбок →</div>
+      </div>
+      <div className="mobile-reel-controls" aria-label="Навигация по работам">
+        <button className="reel-btn reel-prev" onClick={() => scrollSlide(-1)} disabled={activeIdx === 0} aria-label="Предыдущая работа">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+        </button>
+        <span className="reel-counter">{String(activeIdx + 1).padStart(2, '0')} / {String(projects.length).padStart(2, '0')}</span>
+        <button className="reel-btn reel-next" onClick={() => scrollSlide(1)} disabled={activeIdx === projects.length - 1} aria-label="Следующая работа">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+        </button>
       </div>
     </>
   )
