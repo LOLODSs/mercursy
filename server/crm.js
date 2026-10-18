@@ -108,6 +108,35 @@ export function addLeadNote(id, noteText) {
   return lead
 }
 
+export function updateLeadField(id, field, value) {
+  const leads = getAllLeads()
+  const lead = leads.find((l) => l.id === id)
+  if (!lead) return null
+
+  lead[field] = String(value).trim()
+  if (field === 'budget') {
+    lead.price = parseAmount(lead[field])
+  }
+  lead.updatedAt = new Date().toISOString()
+  saveLeads(leads)
+  return lead
+}
+
+export function searchLeads(query = '') {
+  const q = String(query).toLowerCase().trim()
+  if (!q) return []
+  const leads = getAllLeads()
+  return leads.filter((l) => {
+    const inName = (l.name || '').toLowerCase().includes(q)
+    const inContact = (l.contact || '').toLowerCase().includes(q)
+    const inType = (l.type || '').toLowerCase().includes(q)
+    const inTask = (l.task || '').toLowerCase().includes(q)
+    const inBudget = (l.budget || '').toLowerCase().includes(q)
+    const inNotes = (l.notes || []).some((n) => (n.text || '').toLowerCase().includes(q))
+    return inName || inContact || inType || inTask || inBudget || inNotes
+  })
+}
+
 export function deleteLead(id) {
   const leads = getAllLeads()
   const filtered = leads.filter((l) => l.id !== id)

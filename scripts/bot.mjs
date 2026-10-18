@@ -26,6 +26,8 @@ import {
   formatRubles,
   parseAmount,
   exportLeadsToCsv,
+  updateLeadField,
+  searchLeads,
 } from '../server/crm.js'
 
 // Load .env
@@ -76,6 +78,16 @@ async function tg(method, body = {}) {
 // Memory sessions
 const clientSessions = new Map() // clientChatId -> { step, data }
 const adminSessions = new Map()  // adminChatId -> { type, step, data }
+
+// Persistent bottom reply keyboard for Admin
+const ADMIN_KEYBOARD = {
+  keyboard: [
+    [{ text: '📊 CRM' }, { text: '🟡 В работе' }, { text: '📥 Новые' }],
+    [{ text: '➕ Добавить сделку' }, { text: '💰 Финансы' }, { text: '🔍 Поиск' }],
+  ],
+  resize_keyboard: true,
+  is_persistent: true,
+}
 
 // Cases data
 const CASES = {
@@ -187,14 +199,15 @@ function renderAdminDashboard() {
       ],
       [
         { text: '➕ Добавить сделку', callback_data: 'crm:add_deal' },
-        { text: '💰 Финансы', callback_data: 'crm:finances' },
+        { text: '🔍 Поиск по базе', callback_data: 'crm:search' },
       ],
       [
+        { text: '💰 Финансы', callback_data: 'crm:finances' },
         { text: '📥 Скачать базу (.csv)', callback_data: 'crm:export_csv' },
-        { text: '🧪 Тест-лид', callback_data: 'admin:test_lead' },
       ],
       [
         { text: '👥 Клиентское меню', callback_data: 'client:menu' },
+        { text: '🧪 Тест-лид', callback_data: 'admin:test_lead' },
       ],
     ],
   }
@@ -246,6 +259,44 @@ function renderLeadList(status) {
   return { text: lines.join('\n'), reply_markup: { inline_keyboard: buttons } }
 }
 
+function renderSearchResults(query) {
+  const results = searchLeads(query)
+  if (!results.length) {
+    return {
+      text: [
+        `🔍 <b>Поиск по запросу «${stripHtml(query)}»:</b>`,
+        '',
+        'Ничего не найдено в базе сделок.',
+      ].join('\n'),
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '➕ Создать сделку', callback_data: 'crm:add_deal' }],
+          [{ text: '🔙 В главное меню CRM', callback_data: 'crm:home' }],
+        ],
+      },
+    }
+  }
+
+  const lines = [
+    `🔍 <b>Результаты поиска по «${stripHtml(query)}» (${results.length}):</b>`,
+    '',
+  ]
+  results.slice(0, 8).forEach((l, idx) => {
+    lines.push(`<b>${idx + 1}. ${l.name}</b> (${statusBadge(l.status)})`)
+    lines.push(`• Бюджет: ${l.budget} | Сроки: ${l.deadline}`)
+    lines.push(`• Контакт: <code>${l.contact}</code>`)
+    lines.push('')
+  })
+  lines.push('Нажми на проект ниже, чтобы открыть карточку:')
+
+  const buttons = results.slice(0, 8).map((l, idx) => [
+    { text: `${idx + 1}. ${l.name} — ${l.budget}`, callback_data: `crm:view:${l.id}` },
+  ])
+  buttons.push([{ text: '🔙 Назад в CRM', callback_data: 'crm:home' }])
+
+  return { text: lines.join('\n'), reply_markup: { inline_keyboard: buttons } }
+}
+
 function renderLeadCard(lead) {
   const tgHandle = lead.contact.startsWith('@')
     ? lead.contact.slice(1)
@@ -289,6 +340,12 @@ function renderLeadCard(lead) {
     statusRow.push({ text: '⚪ В архив', callback_data: `crm:set_status:${lead.id}:archived` })
   }
   if (statusRow.length) buttons.push(statusRow)
+
+  buttons.push([
+    { text: '✏️ Бюджет', callback_data: `crm:edit:${lead.id}:budget` },
+    { text: '⏰ Сроки', callback_data: `crm:edit:${lead.id}:deadline` },
+    { text: '📬 Контакт', callback_data: `crm:edit:${lead.id}:contact` },
+  ])
 
   buttons.push([
     { text: '📝 Добавить заметку', callback_data: `crm:add_note:${lead.id}` },
@@ -369,6 +426,12 @@ async function handleStart(chatId, from) {
 
   if (isMe) {
     adminSessions.delete(chatId)
+    await tg('sendMessage', {
+      chat_id: chatId,
+      text: '👑 <b>Панель управления mercury CRM</b>\nБыстрые кнопки закреплены внизу экрана 👇',
+      parse_mode: 'HTML',
+      reply_markup: ADMIN_KEYBOARD,
+    })
     const { text, reply_markup } = renderAdminDashboard()
     return tg('sendMessage', {
       chat_id: chatId,
@@ -505,6 +568,44 @@ async function handleCallback(cb) {
     return tg('sendMessage', {
       chat_id: chatId,
       text: `📝 <b>Добавление заметки к проекту «${lead?.name || 'Лид'}»:</b>\n\nНапиши текст заметки (например: <i>«Внёс 50% предоплаты»</i> или <i>«Жду логотип до понедельника»</i>):`,
+      parse_mode: 'HTML',
+      reply_markup: {
+        inline_keyboard: [[{ text: 'Отмена', callback_data: `crm:view:${leadId}` }]],
+      },
+    })
+  }
+
+  // Search prompt
+  if (data === 'crm:search') {
+    await tg('answerCallbackQuery', { callback_query_id: cb.id })
+    adminSessions.set(chatId, { type: 'search' })
+    return tg('sendMessage', {
+      chat_id: chatId,
+      text: '🔍 <b>Поиск по базе сделок:</b>\n\nВведи имя клиента, контакт (@username, телефон) или слово из задачи:',
+      parse_mode: 'HTML',
+      reply_markup: {
+        inline_keyboard: [[{ text: 'Отмена', callback_data: 'crm:home' }]],
+      },
+    })
+  }
+
+  // Quick edits (budget, deadline, contact)
+  if (data.startsWith('crm:edit:')) {
+    const [, , leadId, field] = data.split(':')
+    const lead = getLead(leadId)
+    await tg('answerCallbackQuery', { callback_query_id: cb.id })
+    if (!lead) return
+
+    adminSessions.set(chatId, { type: 'edit_field', leadId, field })
+    const prompts = {
+      budget: `💰 <b>Изменение бюджета для «${lead.name}»:</b>\n\nТекущий бюджет: <b>${lead.budget}</b>\n\nВведи новую сумму (например: <i>95 000 ₽</i>):`,
+      deadline: `⏰ <b>Изменение сроков для «${lead.name}»:</b>\n\nТекущие сроки: <b>${lead.deadline}</b>\n\nВведи новый дедлайн (например: <i>5 дней</i> или <i>до 25 октября</i>):`,
+      contact: `📬 <b>Изменение контакта для «${lead.name}»:</b>\n\nТекущий контакт: <code>${lead.contact}</code>\n\nВведи новый контакт (@username, телефон или ссылка):`,
+    }
+
+    return tg('sendMessage', {
+      chat_id: chatId,
+      text: prompts[field] || 'Введи новое значение:',
       parse_mode: 'HTML',
       reply_markup: {
         inline_keyboard: [[{ text: 'Отмена', callback_data: `crm:view:${leadId}` }]],
@@ -1029,7 +1130,90 @@ async function handleTextMessage(msg) {
   if (isMe) {
     const adminSess = adminSessions.get(chatId)
 
-    // A) Adding Note
+    // Persistent Bottom Keyboard Commands
+    if (text === '📊 CRM' || text === '📊 CRM Главная') {
+      adminSessions.delete(chatId)
+      const { text: dashText, reply_markup: dashMarkup } = renderAdminDashboard()
+      return tg('sendMessage', { chat_id: chatId, text: dashText, parse_mode: 'HTML', reply_markup: dashMarkup })
+    }
+    if (text === '🟡 В работе') {
+      adminSessions.delete(chatId)
+      const { text: lText, reply_markup: lMarkup } = renderLeadList('in_progress')
+      return tg('sendMessage', { chat_id: chatId, text: lText, parse_mode: 'HTML', reply_markup: lMarkup })
+    }
+    if (text === '📥 Новые') {
+      adminSessions.delete(chatId)
+      const { text: lText, reply_markup: lMarkup } = renderLeadList('new')
+      return tg('sendMessage', { chat_id: chatId, text: lText, parse_mode: 'HTML', reply_markup: lMarkup })
+    }
+    if (text === '➕ Добавить сделку' || text === '➕ Новая сделка') {
+      adminSessions.set(chatId, { type: 'create_deal', step: 'name', data: {} })
+      return tg('sendMessage', {
+        chat_id: chatId,
+        text: '➕ <b>Создание новой сделки (1 из 5)</b>\n\nКак зовут клиента?',
+        parse_mode: 'HTML',
+        reply_markup: { inline_keyboard: [[{ text: 'Отмена', callback_data: 'crm:home' }]] },
+      })
+    }
+    if (text === '💰 Финансы') {
+      adminSessions.delete(chatId)
+      const { text: finText, reply_markup: finMarkup } = renderFinancialDashboard()
+      return tg('sendMessage', { chat_id: chatId, text: finText, parse_mode: 'HTML', reply_markup: finMarkup })
+    }
+    if (text === '🔍 Поиск' || text.startsWith('/find')) {
+      const query = text.startsWith('/find') ? text.slice(5).trim() : ''
+      if (query) {
+        adminSessions.delete(chatId)
+        const { text: sText, reply_markup: sMarkup } = renderSearchResults(query)
+        return tg('sendMessage', { chat_id: chatId, text: sText, parse_mode: 'HTML', reply_markup: sMarkup })
+      }
+      adminSessions.set(chatId, { type: 'search' })
+      return tg('sendMessage', {
+        chat_id: chatId,
+        text: '🔍 <b>Поиск по базе сделок:</b>\n\nВведи имя клиента, контакт (@username, телефон) или слово из задачи:',
+        parse_mode: 'HTML',
+        reply_markup: { inline_keyboard: [[{ text: 'Отмена', callback_data: 'crm:home' }]] },
+      })
+    }
+
+    // A) Quick Editing Field (budget, deadline, contact)
+    if (adminSess && adminSess.type === 'edit_field') {
+      const { leadId, field } = adminSess
+      adminSessions.delete(chatId)
+      const updated = updateLeadField(leadId, field, text)
+      const fieldNames = { budget: 'Бюджет', deadline: 'Сроки', contact: 'Контакт' }
+      const fName = fieldNames[field] || field
+
+      await tg('sendMessage', {
+        chat_id: chatId,
+        text: `✅ <b>${fName} успешно обновлён!</b>`,
+        parse_mode: 'HTML',
+      })
+      if (updated) {
+        const { text: cardText, reply_markup } = renderLeadCard(updated)
+        return tg('sendMessage', {
+          chat_id: chatId,
+          text: cardText,
+          parse_mode: 'HTML',
+          reply_markup,
+        })
+      }
+      return
+    }
+
+    // B) Search Session
+    if (adminSess && adminSess.type === 'search') {
+      adminSessions.delete(chatId)
+      const { text: sText, reply_markup: sMarkup } = renderSearchResults(text)
+      return tg('sendMessage', {
+        chat_id: chatId,
+        text: sText,
+        parse_mode: 'HTML',
+        reply_markup: sMarkup,
+      })
+    }
+
+    // C) Adding Note
     if (adminSess && adminSess.type === 'add_note') {
       const { leadId } = adminSess
       adminSessions.delete(chatId)
