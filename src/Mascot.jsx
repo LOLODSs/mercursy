@@ -117,6 +117,17 @@ export default function Mascot({ open, setOpen, prefill, chapterId, onGoWorks })
     setTimeout(() => inputRef.current?.focus({ preventScroll: true }), 450)
   }, [open, prefill])
 
+  // закрытие по клику вне чата
+  useEffect(() => {
+    if (!open) return
+    const onOutside = (e) => {
+      if (panel.current?.contains(e.target) || launcher.current?.contains(e.target)) return
+      setOpen(false)
+    }
+    document.addEventListener('pointerdown', onOutside)
+    return () => document.removeEventListener('pointerdown', onOutside)
+  }, [open, setOpen])
+
   // подсказки по разделам
   useEffect(() => {
     setHint(null)

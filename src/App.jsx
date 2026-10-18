@@ -176,7 +176,7 @@ export default function App() {
 
   /* input */
   useEffect(() => {
-    const busy = (e) => overlay || chat.open || e.target.closest?.('input,textarea,select,.chat,.case')
+    const busy = (e) => overlay || (isMobile() && chat.open) || e.target.closest?.('input,textarea,select,.chat,.case')
     let acc = 0, accT = 0
     const onWheel = (e) => {
       if (busy(e) || isMobile()) return // Native chapter scrolling; use the labelled navigation to change chapters.
@@ -258,10 +258,10 @@ export default function App() {
       <div className="stage" ref={stage} aria-hidden="true" />
       <Loader pct={loadPct} done={ready} />
 
-      <header className="top" inert={overlay || chat.open}>
+      <header className="top" inert={overlay}>
         <button className="logo" onClick={() => go(0, { queue: true })}><span className="logo-drop" />{profile.name}</button>
         {profile.availability && <span className="avail"><i />{profile.availability}</span>}
-        <ChapterNav chapter={chapter} go={go} blocked={overlay || chat.open} />
+        <ChapterNav chapter={chapter} go={go} blocked={overlay} />
         <button className={`fx-toggle ${fx ? 'on' : ''}`} role="switch" aria-checked={fx} disabled={!canGL} onClick={() => toggleFx()}
           title={!canGL ? '3D недоступно на этом устройстве' : fx ? 'Выключить 3D — если сайт тормозит' : 'Включить живую 3D-ртуть'}>
           <span className="fx-track"><span className="fx-knob" /></span>3D
@@ -280,7 +280,7 @@ export default function App() {
       <div className="progress" aria-hidden="true"><span style={{ transform: `scaleY(${(chapter + 1) / chapters.length})` }} /></div>
       <div className="counter" aria-hidden="true"><b>0{chapter + 1}</b> / 0{chapters.length}</div>
 
-      <main className={`chapter ch-${id} ${leaving ? 'leaving' : ''} ${ready ? '' : 'wait'}`} key={shown} tabIndex={0} aria-label={chapters[shown].name} inert={overlay || chat.open}>
+      <main className={`chapter ch-${id} ${leaving ? 'leaving' : ''} ${ready ? '' : 'wait'}`} key={shown} tabIndex={0} aria-label={chapters[shown].name} inert={overlay}>
         <ChapterHeading id={id} />
         {id === 'home' && <Home go={go} openChat={openChat} />}
         {id === 'services' && <Services openType={openType} />}
