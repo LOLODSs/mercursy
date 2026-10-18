@@ -8,6 +8,7 @@
     "check": "node scripts/check-placeholders.js",
     "prebuild": "node scripts/check-placeholders.js",
     "build": "vite build",
+    "start": "node server.js",
     "preview": "vite preview",
     "bot": "node scripts/bot.mjs",
     "tg:chat-id": "node scripts/tg-chat-id.js",

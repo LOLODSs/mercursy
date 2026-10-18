@@ -184,7 +184,11 @@ export default function Mascot({ open, setOpen, prefill, chapterId, onGoWorks })
     let res = 'error'
     try {
       const ac = new AbortController(); const to = setTimeout(() => ac.abort(), 12000)
-      const r = await fetch(M.endpoint, { signal: ac.signal, method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+      let r = await fetch(M.endpoint, { signal: ac.signal, method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+      if ((r.status === 404 || r.status === 405) && M.endpoint === '/api/lead') {
+        const rPhp = await fetch('./api/lead.php', { signal: ac.signal, method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).catch(() => null)
+        if (rPhp) r = rPhp
+      }
       clearTimeout(to)
       const j = await r.json().catch(() => ({}))
       // демо-режим: бэкенд ещё не подключён и сайт в режиме превью (site.showDemoBadges)

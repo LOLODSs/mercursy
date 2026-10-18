@@ -1,0 +1,6 @@
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+  # Перенаправление /api/lead на api/lead.php
+  RewriteRule ^api/lead/?$ api/lead.php [L,QSA]
+</IfModule>
