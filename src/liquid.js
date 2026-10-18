@@ -82,7 +82,7 @@ void main(){
     if(h>0.){ h=sqrt(h); t0=min(t0,-bb-h); t1=max(t1,-bb+h); } }
   if(t1>0. && safe>0.){
     float t=max(t0,0.), md=1e3; bool hit=false; t1=min(t1,9.);
-    for(int i=0;i<70;i++){ vec3 q=ro+rd*t; float d=map(q); md=min(md,d); if(d<.0012){hit=true;break;} t+=d*.95; if(t>t1)break; }
+    for(int i=0;i<48;i++){ vec3 q=ro+rd*t; float d=map(q); md=min(md,d); if(d<.0012){hit=true;break;} t+=d*.95; if(t>t1)break; }
     vec3 bgCol=col*(.5+.5*smoothstep(0.,.4*uShapeScale,md));
     if(hit){
       vec3 q=ro+rd*t; vec3 n=nrm(q);
@@ -113,7 +113,7 @@ export class Liquid {
     const cv = this.canvas = document.createElement('canvas')
     el.appendChild(cv)
     this.mobile = isMobile()
-    this.maxQ = this.mobile ? 0.85 : 1.0
+    this.maxQ = this.mobile ? 0.8 : 1.0
     this.quality = this.maxQ
     this.cA = null; this.cB = null; this.cache = new Map(); this.pool = []
     this.uB = new Float32Array(N * 4)
@@ -182,7 +182,7 @@ export class Liquid {
   resume() { this.paused = 0; this.start() }
   dpr() {
     const raw = devicePixelRatio || 1
-    const d = Math.min(Math.max(raw, this.mobile ? 1.5 : 1), 2)
+    const d = Math.min(Math.max(raw, this.mobile ? 1.4 : 1), this.mobile ? 1.6 : 2)
     const maxDim = Math.max(innerWidth, innerHeight) * d
     return maxDim > 2560 ? Math.max(1, 2560 / Math.max(innerWidth, innerHeight)) : d
   }

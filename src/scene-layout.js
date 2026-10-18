@@ -44,7 +44,7 @@ export class SceneLayout {
   constructor(onChange) {
     this.onChange=onChange;this.chapter='home';this.frame=0
     this.update=()=>{if(!this.frame)this.frame=requestAnimationFrame(()=>{this.frame=0;this.measure()})}
-    this.scroll=e=>{if(e.target?.classList?.contains('chapter'))this.update()}
+    this.scroll=e=>{if(!isMobile() && e.target?.classList?.contains('chapter'))this.update()}
     this.ro=new ResizeObserver(this.update)
     this.mo=new MutationObserver(this.update)
     const app=document.querySelector('.app');if(app)this.mo.observe(app,{childList:true})
@@ -54,6 +54,11 @@ export class SceneLayout {
   }
   setChapter(chapter){this.chapter=chapter;this.measure()}
   measure(){
+    if (isMobile()) {
+      const next = readLayout(this.chapter), key = JSON.stringify(next)
+      if (key !== this.key) { this.key = key; this.current = next; this.onChange?.(next) }
+      return
+    }
     const slot=document.querySelector(`.scene-slot[data-chapter="${this.chapter}"]`),main=slot?.closest('.chapter')
     if(slot!==this.slot){this.ro.disconnect();this.slot=slot;if(slot)this.ro.observe(slot);if(main)this.ro.observe(main)}
     const next=readLayout(this.chapter),key=JSON.stringify(next)

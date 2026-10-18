@@ -131,7 +131,8 @@ export default function App() {
     // на телефоне чат-бриф раскрывается на весь экран — там ртуть тоже не видна
     const covered = openCase || (chat.open && isMobile())
     if (!covered) { l.resume(); return }
-    const t = setTimeout(() => l.pause(), openCase ? 1100 : 500)
+    const pauseDelay = isMobile() ? (openCase ? 160 : 250) : (openCase ? 1100 : 500)
+    const t = setTimeout(() => l.pause(), pauseDelay)
     return () => clearTimeout(t)
   }, [openCase, chat.open, ready, fx])
 
