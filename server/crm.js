@@ -58,20 +58,48 @@ export function addLead(data) {
     id,
     name: String(data.name || 'Без имени').trim(),
     contact: String(data.contact || '').trim(),
+    clientId: data.clientId ? String(data.clientId) : null,
     type: String(data.type || 'Проект').trim(),
     ref: data.ref ? String(data.ref).trim() : null,
     task: String(data.task || '').trim(),
     budget: String(data.budget || 'Не указан').trim(),
     price: parseAmount(data.budget),
-    deadline: String(data.deadline || 'Не указан').trim(),
+    deadline: String(data.deadline || '5–8 дней').trim(),
     page: String(data.page || '').trim(),
     status: data.status || 'new', // 'new' | 'in_progress' | 'done' | 'archived'
+    paymentStatus: data.paymentStatus || 'unpaid', // 'unpaid' | 'advance_50' | 'paid_full'
     notes: Array.isArray(data.notes) ? data.notes : [],
     createdAt: now,
     updatedAt: now,
   }
 
   leads.unshift(lead) // Add to start
+  saveLeads(leads)
+  return lead
+}
+
+export function setLeadPayment(id, status) {
+  const leads = getAllLeads()
+  const lead = leads.find((l) => l.id === id)
+  if (!lead) return null
+
+  lead.paymentStatus = status
+  lead.updatedAt = new Date().toISOString()
+  if (!Array.isArray(lead.notes)) lead.notes = []
+
+  const price = lead.price || parseAmount(lead.budget)
+  const half = Math.round(price / 2)
+  const noteText = status === 'advance_50'
+    ? `💳 Внесена предоплата 50%: ${formatRubles(half)} (остаток: ${formatRubles(half)})`
+    : status === 'paid_full'
+    ? `💰 Полная оплата 100%: ${formatRubles(price)}`
+    : '⏳ Сброс статуса оплаты (ожидание предоплаты)'
+
+  lead.notes.push({
+    id: `note_${Date.now()}`,
+    text: noteText,
+    createdAt: new Date().toISOString(),
+  })
   saveLeads(leads)
   return lead
 }
@@ -171,12 +199,23 @@ export function getFinancialStats() {
   const doneSum = doneLeads.reduce((acc, l) => acc + (l.price || parseAmount(l.budget)), 0)
   const totalPipeline = inProgressSum + doneSum
 
+  // Prepayments breakdown
+  const advanceCollected = inProgressLeads.reduce((acc, l) => {
+    const p = l.price || parseAmount(l.budget)
+    if (l.paymentStatus === 'paid_full') return acc + p
+    if (l.paymentStatus === 'advance_50') return acc + Math.round(p / 2)
+    return acc
+  }, 0)
+
+  const advanceRemaining = inProgressSum - advanceCollected
   const avgCheck = doneLeads.length ? Math.round(doneSum / doneLeads.length) : 0
 
   return {
     inProgressSum,
     doneSum,
     totalPipeline,
+    advanceCollected,
+    advanceRemaining,
     avgCheck,
     inProgressCount: inProgressLeads.length,
     doneCount: doneLeads.length,

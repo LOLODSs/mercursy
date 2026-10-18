@@ -28,6 +28,7 @@ import {
   exportLeadsToCsv,
   updateLeadField,
   searchLeads,
+  setLeadPayment,
 } from '../server/crm.js'
 
 // Load .env
@@ -75,6 +76,21 @@ async function tg(method, body = {}) {
   }
 }
 
+// Client notifier (for project status updates & proposal delivery)
+async function notifyClient(clientId, text, reply_markup = undefined) {
+  if (!clientId) return
+  try {
+    await tg('sendMessage', {
+      chat_id: clientId,
+      text,
+      parse_mode: 'HTML',
+      reply_markup,
+    })
+  } catch (err) {
+    console.warn('[Bot] Не удалось отправить уведомление клиенту:', err.message)
+  }
+}
+
 // Memory sessions
 const clientSessions = new Map() // clientChatId -> { step, data }
 const adminSessions = new Map()  // adminChatId -> { type, step, data }
@@ -83,7 +99,8 @@ const adminSessions = new Map()  // adminChatId -> { type, step, data }
 const ADMIN_KEYBOARD = {
   keyboard: [
     [{ text: '📊 CRM' }, { text: '🟡 В работе' }, { text: '📥 Новые' }],
-    [{ text: '➕ Добавить сделку' }, { text: '💰 Финансы' }, { text: '🔍 Поиск' }],
+    [{ text: '☀️ Мой день' }, { text: '💰 Финансы' }, { text: '🔍 Поиск' }],
+    [{ text: '➕ Добавить сделку' }],
   ],
   resize_keyboard: true,
   is_persistent: true,
@@ -198,15 +215,18 @@ function renderAdminDashboard() {
         { text: `⚪ Архив (${stats.archived})`, callback_data: 'crm:list:archived' },
       ],
       [
+        { text: '☀️ Мой день', callback_data: 'crm:digest' },
         { text: '➕ Добавить сделку', callback_data: 'crm:add_deal' },
-        { text: '🔍 Поиск по базе', callback_data: 'crm:search' },
       ],
       [
         { text: '💰 Финансы', callback_data: 'crm:finances' },
-        { text: '📥 Скачать базу (.csv)', callback_data: 'crm:export_csv' },
+        { text: '🔍 Поиск по базе', callback_data: 'crm:search' },
       ],
       [
+        { text: '📥 Скачать базу (.csv)', callback_data: 'crm:export_csv' },
         { text: '👥 Клиентское меню', callback_data: 'client:menu' },
+      ],
+      [
         { text: '🧪 Тест-лид', callback_data: 'admin:test_lead' },
       ],
     ],
@@ -297,6 +317,18 @@ function renderSearchResults(query) {
   return { text: lines.join('\n'), reply_markup: { inline_keyboard: buttons } }
 }
 
+function paymentBadge(lead) {
+  const price = lead.price || parseAmount(lead.budget)
+  const half = Math.round(price / 2)
+  if (lead.paymentStatus === 'paid_full') {
+    return `🟢 <b>100% оплачено</b> (${formatRubles(price)})`
+  }
+  if (lead.paymentStatus === 'advance_50') {
+    return `🟡 <b>Аванс 50% внесён</b> (${formatRubles(half)}), остаток: ${formatRubles(half)}`
+  }
+  return '⚪ <i>Ожидает аванса / не оплачен</i>'
+}
+
 function renderLeadCard(lead) {
   const tgHandle = lead.contact.startsWith('@')
     ? lead.contact.slice(1)
@@ -312,10 +344,12 @@ function renderLeadCard(lead) {
     '',
     `👤 <b>Клиент:</b> ${lead.name}`,
     `📬 <b>Контакт:</b> <code>${lead.contact}</code>`,
+    lead.clientId ? `🆔 <b>Telegram ID клиента:</b> <code>${lead.clientId}</code>` : '',
     `🧩 <b>Тип проекта:</b> ${lead.type}${lead.ref ? ` (${lead.ref})` : ''}`,
     `📝 <b>Задача:</b>\n${lead.task}`,
     '',
     `💰 <b>Бюджет:</b> ${lead.budget}`,
+    `💳 <b>Оплата:</b> ${paymentBadge(lead)}`,
     `⏰ <b>Сроки:</b> ${lead.deadline}`,
     `📅 <b>Создан:</b> ${formatDate(lead.createdAt)}`,
     lead.updatedAt ? `🔄 <b>Обновлён:</b> ${formatDate(lead.updatedAt)}` : '',
@@ -341,28 +375,176 @@ function renderLeadCard(lead) {
   }
   if (statusRow.length) buttons.push(statusRow)
 
+  // Payment management buttons
+  if (lead.paymentStatus === 'paid_full') {
+    buttons.push([
+      { text: '✅ Оплачено 100%', callback_data: `crm:set_pay:${lead.id}:paid_full` },
+      { text: '🔄 Сброс оплаты', callback_data: `crm:set_pay:${lead.id}:unpaid` },
+    ])
+  } else if (lead.paymentStatus === 'advance_50') {
+    buttons.push([
+      { text: '💰 Оплачено 100%', callback_data: `crm:set_pay:${lead.id}:paid_full` },
+      { text: '🔄 Сброс оплаты', callback_data: `crm:set_pay:${lead.id}:unpaid` },
+    ])
+  } else {
+    buttons.push([
+      { text: '💳 Внесено 50%', callback_data: `crm:set_pay:${lead.id}:advance_50` },
+      { text: '💰 Оплачено 100%', callback_data: `crm:set_pay:${lead.id}:paid_full` },
+    ])
+  }
+
+  // Quick edits
   buttons.push([
     { text: '✏️ Бюджет', callback_data: `crm:edit:${lead.id}:budget` },
     { text: '⏰ Сроки', callback_data: `crm:edit:${lead.id}:deadline` },
     { text: '📬 Контакт', callback_data: `crm:edit:${lead.id}:contact` },
   ])
 
+  // Commercial proposal & templates
   buttons.push([
-    { text: '📝 Добавить заметку', callback_data: `crm:add_note:${lead.id}` },
+    { text: '📄 Сформировать КП', callback_data: `crm:make_kp:${lead.id}` },
     { text: '💬 Шаблоны ответов', callback_data: `crm:tpl_menu:${lead.id}` },
   ])
 
   buttons.push([
+    { text: '📝 Добавить заметку', callback_data: `crm:add_note:${lead.id}` },
     { text: '📋 Копировать бриф', callback_data: `crm:copy:${lead.id}` },
-    { text: '❌ Удалить', callback_data: `crm:delete:${lead.id}` },
   ])
 
   buttons.push([
+    { text: '❌ Удалить проект', callback_data: `crm:delete:${lead.id}` },
     { text: `🔙 К списку (${statusBadge(lead.status)})`, callback_data: `crm:list:${lead.status}` },
+  ])
+
+  buttons.push([
     { text: '🏠 Меню CRM', callback_data: 'crm:home' },
   ])
 
   return { text, reply_markup: { inline_keyboard: buttons } }
+}
+
+function renderDailyDigest() {
+  const inProgress = getLeadsByStatus('in_progress')
+  const newLeads = getLeadsByStatus('new')
+  const fin = getFinancialStats()
+
+  const todayStr = new Date().toLocaleDateString('ru-RU', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  })
+  const capitalizedToday = todayStr.charAt(0).toUpperCase() + todayStr.slice(1)
+
+  const lines = [
+    `☀️ <b>Сводка дня mercury CRM</b>`,
+    `📅 <i>${capitalizedToday}</i>`,
+    '',
+    `🟡 <b>В работе: ${inProgress.length} проектов</b> (${formatRubles(fin.inProgressSum)})`,
+  ]
+
+  if (inProgress.length === 0) {
+    lines.push('• Нет активных проектов в разработке')
+  } else {
+    inProgress.forEach((l, idx) => {
+      const payIcon = l.paymentStatus === 'paid_full' ? '🟢 100%' : l.paymentStatus === 'advance_50' ? '🟡 50%' : '⚪ без аванса'
+      lines.push(`<b>${idx + 1}. ${l.name}</b> — ${l.budget}`)
+      lines.push(`   └ ⏰ ${l.deadline} | 💳 ${payIcon} | <code>${l.contact}</code>`)
+    })
+  }
+
+  lines.push('')
+  lines.push(`📥 <b>Новых входящих: ${newLeads.length}</b>`)
+  if (newLeads.length > 0) {
+    newLeads.slice(0, 3).forEach((l, idx) => {
+      lines.push(`• <b>${l.name}</b> (${l.type}): <code>${l.contact}</code>`)
+    })
+    if (newLeads.length > 3) {
+      lines.push(`  <i>...и ещё ${newLeads.length - 3} заявок</i>`)
+    }
+  }
+
+  lines.push('')
+  lines.push('💰 <b>Финансовый пульс:</b>')
+  lines.push(`• Авансов получено: <b>${formatRubles(fin.advanceCollected)}</b>`)
+  lines.push(`• Остаток к получению: <b>${formatRubles(fin.advanceRemaining)}</b>`)
+  lines.push(`• Выручка со сданных: <b>${formatRubles(fin.doneSum)}</b> (${fin.doneCount} проектов)`)
+
+  const buttons = []
+  if (inProgress.length > 0) {
+    buttons.push(inProgress.slice(0, 4).map((l, idx) => ({
+      text: `${idx + 1}. ${l.name}`,
+      callback_data: `crm:view:${l.id}`,
+    })))
+  }
+  if (newLeads.length > 0) {
+    buttons.push([{ text: `📥 Разобрать новые (${newLeads.length})`, callback_data: 'crm:list:new' }])
+  }
+  buttons.push([
+    { text: '➕ Добавить сделку', callback_data: 'crm:add_deal' },
+    { text: '💰 Финансы', callback_data: 'crm:finances' },
+  ])
+  buttons.push([{ text: '🏠 Меню CRM', callback_data: 'crm:home' }])
+
+  return { text, reply_markup: { inline_keyboard: buttons } }
+}
+
+function renderCommercialProposal(lead) {
+  const price = lead.budget && lead.budget !== 'Уточняется' ? lead.budget : 'по согласованию'
+  const time = lead.deadline && lead.deadline !== 'Уточняется' ? lead.deadline : '5–8 рабочих дней'
+  const halfPrice = lead.price ? formatRubles(Math.round(lead.price / 2)) : '50% от суммы'
+
+  const proposalText = [
+    `🤝 Коммерческое предложение: ${lead.type || 'Разработка проекта'}`,
+    `Для: ${lead.name}`,
+    '',
+    `1. Задача проекта:`,
+    `${lead.task || 'Создание и запуск современного цифрового решения под ключ.'}`,
+    '',
+    `2. Что входит в реализацию:`,
+    `• Индивидуальный концепт и адаптивная вёрстка (Desktop, планшеты, смартфоны)`,
+    `• Плавная анимация, интерактив и высокая скорость загрузки`,
+    `• Настройка форм сбора заявок с мгновенным оповещением в Telegram`,
+    `• Базовая SEO-оптимизация, подключение домена и SSL-сертификата`,
+    `• 3 круга правок включено бесплатно (далее — по согласованию)`,
+    '',
+    `3. Этапы и ориентир по срокам (${time}):`,
+    `• Этап 1 (1 день): Согласование структуры и технического задания`,
+    `• Этап 2 (2–3 дня): Интерактивный прототип и визуальный дизайн`,
+    `• Этап 3 (3–5 дней): Разработка, анимации, интеграции и адаптив`,
+    `• Этап 4 (1–2 дня): Тестирование, перенос на ваш хостинг и релиз`,
+    '',
+    `4. Стоимость и порядок оплаты:`,
+    `• Стоимость проекта: ${price}`,
+    `• Условия: 50% предоплата перед стартом (${halfPrice}), 50% после демонстрации и приёмки проекта`,
+    '',
+    `Готовы запустить разработку в ближайшие дни! Напишите, если согласовываем — пришлю реквизиты и начнём. 🚀`,
+  ].join('\n')
+
+  const text = [
+    `📄 <b>Коммерческое предложение для «${lead.name}»</b>`,
+    '',
+    `<code>${stripHtml(proposalText)}</code>`,
+    '',
+    '<i>(Нажми на текст выше, чтобы скопировать готовое КП)</i>',
+  ].join('\n')
+
+  const tgHandle = lead.contact.startsWith('@')
+    ? lead.contact.slice(1)
+    : lead.contact.match(/(?:t\.me|telegram\.me)\/([\w\d_]{4,})/i)?.[1] || null
+
+  const buttons = []
+  if (tgHandle) {
+    buttons.push([{ text: '✍️ Открыть диалог с клиентом', url: `https://t.me/${tgHandle}` }])
+  }
+  if (lead.clientId) {
+    buttons.push([{ text: '🚀 Отправить КП прямо клиенту в бот', callback_data: `crm:send_kp:${lead.id}` }])
+  }
+  buttons.push([
+    { text: '🔙 Назад в карточку', callback_data: `crm:view:${lead.id}` },
+    { text: '🏠 Меню CRM', callback_data: 'crm:home' },
+  ])
+
+  return { text, reply_markup: { inline_keyboard: buttons }, proposalText }
 }
 
 function renderFinancialDashboard() {
@@ -375,6 +557,8 @@ function renderFinancialDashboard() {
     '🟡 <b>В работе прямо сейчас:</b>',
     `• Проектов: <b>${fin.inProgressCount}</b>`,
     `• Сумма в работе: <b>${formatRubles(fin.inProgressSum)}</b>`,
+    `• Авансов получено (50%): <b>${formatRubles(fin.advanceCollected)}</b>`,
+    `• Ожидает получения: <b>${formatRubles(fin.advanceRemaining)}</b>`,
     '',
     '🟢 <b>Уже заработано (сдано):</b>',
     `• Сдано проектов: <b>${fin.doneCount}</b>`,
@@ -712,6 +896,17 @@ async function handleCallback(cb) {
     const alertMsg = newStatus === 'in_progress' ? '🟡 Взят в работу!' : newStatus === 'done' ? '🟢 Проект сдан!' : '⚪ Перенесён в архив'
     await tg('answerCallbackQuery', { callback_query_id: cb.id, text: alertMsg })
     if (updated) {
+      if (updated.clientId && newStatus === 'in_progress') {
+        await notifyClient(
+          updated.clientId,
+          `🚀 <b>Ваш проект взят в работу!</b>\n\nПривет, <b>${updated.name}</b>! Мы официально запустили разработку вашей задачи («${updated.type}»).\n\n⏰ Ориентир по срокам: <b>${updated.deadline || '5–8 дней'}</b>\n💬 Если у вас есть материалы или пожелания — присылайте прямо сюда!`
+        )
+      } else if (updated.clientId && newStatus === 'done') {
+        await notifyClient(
+          updated.clientId,
+          `🎉 <b>Ваш проект успешно завершён и сдан!</b>\n\nВсе работы по «${updated.type}» выполнены. В проект включены 3 круга бесплатных правок.\n\nСпасибо за выбор mercury! Будем рады дальнейшему сотрудничеству.`
+        )
+      }
       const { text, reply_markup } = renderLeadCard(updated)
       return tg('editMessageText', {
         chat_id: chatId,
@@ -721,6 +916,79 @@ async function handleCallback(cb) {
         reply_markup,
       })
     }
+  }
+
+  // Payment status
+  if (data.startsWith('crm:set_pay:')) {
+    const [, , leadId, payStatus] = data.split(':')
+    const updated = setLeadPayment(leadId, payStatus)
+    const alertMsg = payStatus === 'advance_50'
+      ? '💳 Аванс 50% зафиксирован в CRM!'
+      : payStatus === 'paid_full'
+      ? '💰 Оплата 100% зафиксирована!'
+      : '⏳ Статус оплаты сброшен'
+    await tg('answerCallbackQuery', { callback_query_id: cb.id, text: alertMsg })
+    if (updated) {
+      const { text, reply_markup } = renderLeadCard(updated)
+      return tg('editMessageText', {
+        chat_id: chatId,
+        message_id: msgId,
+        text,
+        parse_mode: 'HTML',
+        reply_markup,
+      })
+    }
+  }
+
+  // Commercial Proposal (КП)
+  if (data.startsWith('crm:make_kp:')) {
+    const leadId = data.split(':')[2]
+    const lead = getLead(leadId)
+    await tg('answerCallbackQuery', { callback_query_id: cb.id })
+    if (!lead) return
+    const { text, reply_markup } = renderCommercialProposal(lead)
+    return tg('editMessageText', {
+      chat_id: chatId,
+      message_id: msgId,
+      text,
+      parse_mode: 'HTML',
+      reply_markup,
+    })
+  }
+
+  if (data.startsWith('crm:send_kp:')) {
+    const leadId = data.split(':')[2]
+    const lead = getLead(leadId)
+    if (!lead || !lead.clientId) {
+      return tg('answerCallbackQuery', {
+        callback_query_id: cb.id,
+        text: 'У лида нет привязанного Telegram-аккаунта клиента',
+        show_alert: true,
+      })
+    }
+    const { proposalText } = renderCommercialProposal(lead)
+    await notifyClient(
+      lead.clientId,
+      `🤝 <b>Коммерческое предложение по вашей заявке:</b>\n\n${proposalText}\n\n💬 Если у вас есть вопросы или пожелания — напишите прямо в ответ или Даде (@Xitinchik)!`
+    )
+    return tg('answerCallbackQuery', {
+      callback_query_id: cb.id,
+      text: '✅ КП успешно отправлено клиенту прямо в бот!',
+      show_alert: true,
+    })
+  }
+
+  // Daily digest
+  if (data === 'crm:digest' || data === 'crm:today') {
+    await tg('answerCallbackQuery', { callback_query_id: cb.id })
+    const { text, reply_markup } = renderDailyDigest()
+    return tg('editMessageText', {
+      chat_id: chatId,
+      message_id: msgId,
+      text,
+      parse_mode: 'HTML',
+      reply_markup,
+    })
   }
 
   // Delete lead
@@ -744,6 +1012,12 @@ async function handleCallback(cb) {
     let lead = getLead(leadId)
     if (lead) {
       lead = updateLeadStatus(leadId, 'in_progress')
+      if (lead.clientId) {
+        await notifyClient(
+          lead.clientId,
+          `🚀 <b>Ваш проект взят в работу!</b>\n\nПривет, <b>${lead.name}</b>! Мы официально запустили разработку вашей задачи («${lead.type}»).\n\n⏰ Ориентир по срокам: <b>${lead.deadline || '5–8 дней'}</b>\n💬 Если у вас есть материалы или пожелания — присылайте прямо сюда!`
+        )
+      }
     }
     await tg('answerCallbackQuery', {
       callback_query_id: cb.id,
@@ -780,7 +1054,15 @@ async function handleCallback(cb) {
   if (data.startsWith('crm:done:')) {
     const leadId = data.split(':')[2]
     let lead = getLead(leadId)
-    if (lead) updateLeadStatus(leadId, 'done')
+    if (lead) {
+      lead = updateLeadStatus(leadId, 'done')
+      if (lead.clientId) {
+        await notifyClient(
+          lead.clientId,
+          `🎉 <b>Ваш проект успешно завершён и сдан!</b>\n\nВсе работы по задаче «${lead.type}» выполнены. В проект включены 3 круга бесплатных правок.\n\nСпасибо за выбор mercury! Будем рады дальнейшему сотрудничеству.`
+        )
+      }
+    }
     await tg('answerCallbackQuery', { callback_query_id: cb.id, text: '🟢 Проект сдан! Посмотреть: /crm' })
 
     const rawText = (cb.message?.text || '').replace(/^(?:🟡 \[В РАБОТЕ.*?\]|🟢 \[СДАН.*?\]|⚪ \[В АРХИВЕ.*?\])\n\n?/i, '').trim()
@@ -1146,6 +1428,11 @@ async function handleTextMessage(msg) {
       const { text: lText, reply_markup: lMarkup } = renderLeadList('new')
       return tg('sendMessage', { chat_id: chatId, text: lText, parse_mode: 'HTML', reply_markup: lMarkup })
     }
+    if (text === '☀️ Мой день' || text === '/today' || text === '/digest') {
+      adminSessions.delete(chatId)
+      const { text: dText, reply_markup: dMarkup } = renderDailyDigest()
+      return tg('sendMessage', { chat_id: chatId, text: dText, parse_mode: 'HTML', reply_markup: dMarkup })
+    }
     if (text === '➕ Добавить сделку' || text === '➕ Новая сделка') {
       adminSessions.set(chatId, { type: 'create_deal', step: 'name', data: {} })
       return tg('sendMessage', {
@@ -1367,6 +1654,7 @@ async function handleTextMessage(msg) {
     const saved = addLead({
       name: leadData.name,
       contact: leadData.contact,
+      clientId: leadData.userId || chatId,
       type: leadData.ref || 'Заявка из бота',
       task: leadData.task,
       budget: 'Уточняется',
