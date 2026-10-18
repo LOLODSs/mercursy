@@ -601,8 +601,10 @@ function Case({ data, onClose, onContact, onNext }) {
   }, [data.idx])
 
   const empty = !data.title
+  const ox = Number.isFinite(data.ox) ? data.ox : (typeof innerWidth !== 'undefined' ? innerWidth / 2 : 0)
+  const oy = Number.isFinite(data.oy) ? data.oy : (typeof innerHeight !== 'undefined' ? innerHeight / 2 : 0)
   return (
-    <div ref={ref} className={`case ${data.demo ? 'has-demo' : ''} ${data.iframe ? 'has-iframe' : ''} ${fullscreenInteractive && isMob && isInteractive ? 'is-fullscreen-interactive' : ''}`} role="dialog" aria-modal="true" aria-label={empty ? 'Свободный слот' : data.title} style={{ '--ox': `${data.ox}px`, '--oy': `${data.oy}px` }} key={data.idx}>
+    <div ref={ref} className={`case ${data.demo ? 'has-demo' : ''} ${data.iframe ? 'has-iframe' : ''} ${fullscreenInteractive && isMob && isInteractive ? 'is-fullscreen-interactive' : ''}`} role="dialog" aria-modal="true" aria-label={empty ? 'Свободный слот' : data.title} style={{ '--ox': `${ox}px`, '--oy': `${oy}px` }} key={data.idx}>
       <button className="case-close" onClick={onClose} aria-label="Закрыть"><svg width="18" height="18" viewBox="0 0 18 18"><path d="M3 3l12 12M15 3L3 15" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" /></svg></button>
       <div className={`case-media ${data.demo ? `demo-${data.demo}` : ''} ${data.iframe ? 'is-iframe' : ''}`}>
         {isMob && isInteractive && fullscreenInteractive && (
