@@ -64,6 +64,7 @@ export default function FlowDemo({ mini = false, paused = false }) {
         <span className={`flow-status ${running ? 'on' : ''}`}><i />{running ? 'Выполняется…' : 'Активен'}</span>
         <span>Выполнений сегодня: <b>{count}</b></span>
       </div>
+      <div className="flow-diagram" tabIndex={mini ? undefined : 0} role={mini ? undefined : "region"} aria-label={mini ? undefined : "Схема: прокрутите вправо, чтобы увидеть все шаги"}>
       <svg viewBox="0 0 880 360" className="flow-svg" aria-label="Схема воркфлоу">
         {EDGES.map(([a, b]) => {
           const k = `${a}-${b}`, st = edges[k]
@@ -84,6 +85,8 @@ export default function FlowDemo({ mini = false, paused = false }) {
           </g>
         ))}
       </svg>
+      </div>
+      {!mini && <p className="flow-scroll-hint">Листай схему вправо, чтобы увидеть все шаги ↔</p>}
       {!mini && (
         <div className="flow-bottom">
           <div className="flow-log">

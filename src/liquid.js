@@ -1,4 +1,5 @@
 import { isMobile } from './mq.js'
+import { SceneLayout, mercuryGeometry, constrainBall } from './scene-layout.js'
 /* Живая ртуть: чистый WebGL без three.js (−500 КБ JS).
    Один полноэкранный треугольник + raymarching метаболов.
    Оптимизации: луч, не задевший ни одну каплю (с запасом на сглаживание и тень),
@@ -14,6 +15,7 @@ const frag = `
 precision highp float;
 varying vec2 vUv;
 uniform vec2 uRes; uniform float uTime; uniform vec4 uB[${N}];
+uniform vec4 uSafe; uniform float uBounded; uniform float uShapeScale;
 uniform sampler2D uA; uniform sampler2D uBt; uniform float uMix;
 float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
 float vnoise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);
@@ -21,8 +23,8 @@ float vnoise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);
 float smin(float a,float b,float k){float h=clamp(.5+.5*(b-a)/k,0.,1.);return mix(b,a,h)-k*h*(1.-h);}
 float map(vec3 p){
   float d=1e3;
-  for(int i=0;i<${N};i++){ vec4 b=uB[i]; d=smin(d,length(p-b.xyz)-b.w,.62); }
-  d+=sin(p.x*5.+uTime*1.3)*sin(p.y*4.+uTime)*sin(p.z*5.+uTime*.7)*.022;
+  for(int i=0;i<${N};i++){ vec4 b=uB[i]; d=smin(d,length(p-b.xyz)-b.w,.62*uShapeScale); }
+  d+=sin(p.x*5.+uTime*1.3)*sin(p.y*4.+uTime)*sin(p.z*5.+uTime*.7)*.022*uShapeScale;
   return d;
 }
 vec3 nrm(vec3 p){const vec2 e=vec2(.0025,-.0025);
@@ -63,30 +65,45 @@ vec3 env(vec3 d){
 }
 void main(){
   vec2 fc=vUv*uRes; vec2 p=(fc-.5*uRes)/uRes.y;
+  vec3 col=poster(vUv); vec3 original=col;
+  float edge=min(min((vUv.x-uSafe.x)*uRes.x,(uSafe.z-vUv.x)*uRes.x),min((vUv.y-uSafe.y)*uRes.y,(uSafe.w-vUv.y)*uRes.y));
+  float safe=uBounded<.5?1.:smoothstep(0.,6.,edge);
+  if(safe<=0.){
+    col*=1.-.38*length(vUv-.5);
+    float lum=dot(col,vec3(.299,.587,.114));
+    col+=(hash(fc+fract(uTime))-.5)*mix(.006,0.,smoothstep(.15,.5,lum));
+    gl_FragColor=vec4(col,1.);return;
+  }
   vec3 ro=vec3(0.,0.,6.), rd=normalize(vec3(p*.8,-1.));
   // ограничивающие сферы: где луч их не задевает, поле > .4 — ни капли, ни тени
   float t0=1e3, t1=-1.;
-  for(int i=0;i<${N};i++){ vec4 b=uB[i]; vec3 oc=ro-b.xyz; float R=b.w+${PAD.toFixed(2)};
+  for(int i=0;i<${N};i++){ vec4 b=uB[i]; vec3 oc=ro-b.xyz; float R=b.w+${PAD.toFixed(2)}*(uBounded>.5?uShapeScale:1.);
     float bb=dot(oc,rd), h=bb*bb-dot(oc,oc)+R*R;
     if(h>0.){ h=sqrt(h); t0=min(t0,-bb-h); t1=max(t1,-bb+h); } }
-  vec3 col=poster(vUv);
-  if(t1>0.){
+  if(t1>0. && safe>0.){
     float t=max(t0,0.), md=1e3; bool hit=false; t1=min(t1,9.);
-    for(int i=0;i<70;i++){ vec3 q=ro+rd*t; float d=map(q); md=min(md,d); if(d<.0015){hit=true;break;} t+=d*.95; if(t>t1)break; }
-    col*=.5+.5*smoothstep(0.,.4,md);
+    for(int i=0;i<70;i++){ vec3 q=ro+rd*t; float d=map(q); md=min(md,d); if(d<.0012){hit=true;break;} t+=d*.95; if(t>t1)break; }
+    vec3 bgCol=col*(.5+.5*smoothstep(0.,.4*uShapeScale,md));
     if(hit){
       vec3 q=ro+rd*t; vec3 n=nrm(q);
-      float fr=pow(1.-max(dot(-rd,n),0.),2.4);
-      vec2 r=n.xy*(.09+.07*(1.-fr));
+      float ndotv=max(dot(-rd,n),0.);
+      float fr=pow(1.-ndotv,2.4);
+      vec2 r=n.xy*(.07+.05*(1.-fr));
       vec3 refr=poster3(vUv,r);
       vec3 R=reflect(rd,n);
-      col=refr*(.8-fr*.5)+env(R)*(.5+fr*1.1);
-      col+=pal(fr*1.3+n.y*.35+uTime*.04)*fr*.5;
-      col+=pow(max(dot(R,normalize(vec3(.35,.8,.55))),0.),70.)*1.4;
+      vec3 mercury=refr*(.8-fr*.4)+env(R)*(.5+fr*1.0);
+      mercury+=pal(fr*1.2+n.y*.3+uTime*.03)*pow(fr,1.5)*.25;
+      mercury+=pow(max(dot(R,normalize(vec3(.35,.8,.55))),0.),70.)*1.4;
+      float edgeAlpha=smoothstep(0.,.07,ndotv);
+      col=mix(bgCol,mercury,edgeAlpha);
+    } else {
+      col=bgCol;
     }
   }
+  col=mix(original,col,safe);
   col*=1.-.38*length(vUv-.5);
-  col+=(hash(fc+fract(uTime))-.5)*.03;
+  float lum=dot(col,vec3(.299,.587,.114));
+  col+=(hash(fc+fract(uTime))-.5)*mix(.006,0.,smoothstep(.15,.5,lum));
   gl_FragColor=vec4(col,1.);
 }`
 
@@ -96,7 +113,7 @@ export class Liquid {
     const cv = this.canvas = document.createElement('canvas')
     el.appendChild(cv)
     this.mobile = isMobile()
-    this.maxQ = this.mobile ? 0.6 : 0.85
+    this.maxQ = this.mobile ? 0.85 : 1.0
     this.quality = this.maxQ
     this.cA = null; this.cB = null; this.cache = new Map(); this.pool = []
     this.uB = new Float32Array(N * 4)
@@ -111,11 +128,12 @@ export class Liquid {
     cv.addEventListener('webglcontextlost', this.onLost = (e) => { e.preventDefault(); this.gl = null; this.stop() })
     cv.addEventListener('webglcontextrestored', this.onRestored = () => { this.initGL(); this.size(); this.cA && this.upload(0, this.cA); this.cB && this.upload(1, this.cB); this.start() })
     this.size()
-    let rt; this.onResize = () => { clearTimeout(rt); rt = setTimeout(() => { this.size(); this.repaint() }, 120) }
+    let rt; this.onResize = () => { this.size(); clearTimeout(rt); rt = setTimeout(() => { this.size(); this.repaint() }, 120) }
     addEventListener('resize', this.onResize)
     this.t0 = performance.now(); this.last = this.t0
     this.loop = (now) => { this.raf = requestAnimationFrame(this.loop); this.tick(now) }
     this.paused = 0
+    this.layout = new SceneLayout(next => { if(next.bounded || this.sceneWasBounded){this.snapScene=true;this.mouse.active=false} this.sceneWasBounded=next.bounded })
     this.start()
     // пауза, когда вкладка скрыта — не жрём батарею
     this.onVis = () => (document.hidden ? this.stop() : this.start())
@@ -135,7 +153,7 @@ export class Liquid {
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW)
     gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0)
     const L = (n) => gl.getUniformLocation(pr, n)
-    this.L = { res: L('uRes'), time: L('uTime'), mix: L('uMix'), b: L('uB'), a: L('uA'), bt: L('uBt') }
+    this.L = { res: L('uRes'), time: L('uTime'), mix: L('uMix'), b: L('uB'), a: L('uA'), bt: L('uBt'), safe: L('uSafe'), bounded: L('uBounded'), shape: L('uShapeScale') }
     gl.uniform1i(this.L.a, 0); gl.uniform1i(this.L.bt, 1)
     this.tex = [0, 1].map((u) => {
       const t = gl.createTexture(); gl.activeTexture(gl.TEXTURE0 + u); gl.bindTexture(gl.TEXTURE_2D, t)
@@ -162,18 +180,24 @@ export class Liquid {
   // App ставит на паузу, когда ртуть всё равно закрыта (открыт кейс)
   pause() { this.paused = 1; this.stop() }
   resume() { this.paused = 0; this.start() }
+  dpr() {
+    const raw = devicePixelRatio || 1
+    const d = Math.min(Math.max(raw, this.mobile ? 1.5 : 1), 2)
+    const maxDim = Math.max(innerWidth, innerHeight) * d
+    return maxDim > 2560 ? Math.max(1, 2560 / Math.max(innerWidth, innerHeight)) : d
+  }
   // размер буфера рендера: меняется и от ресайза, и от губернатора качества
   size() {
-    const w = innerWidth, h = innerHeight, d = Math.min(devicePixelRatio || 1, 2)
+    const w = innerWidth, h = innerHeight
+    const d = this.dpr()
     const cw = Math.max(1, Math.round(w * d * this.quality)), ch = Math.max(1, Math.round(h * d * this.quality))
     if (this.canvas.width !== cw || this.canvas.height !== ch) { this.canvas.width = cw; this.canvas.height = ch }
     this.res = [cw, ch]
     if (this.gl) { this.gl.viewport(0, 0, cw, ch); this.gl.uniform2f(this.L.res, cw, ch) }
   }
-  /* Постеры. Рисуются в разрешении, в котором реально рендерится ртуть (DPR × потолок качества):
-     больше пикселей шейдер всё равно не покажет. Соседние главы рисуются заранее, в простое,
-     поэтому в момент листания не надо рисовать огромный постер — только залить готовую текстуру. */
-  posterScale() { return Math.min(devicePixelRatio || 1, 2) * this.maxQ }
+  /* Постеры: на десктопе точно соответствуют DPR экрана (1:1 пиксель-в-пиксель,
+     без билинейного размытия и алиасинга шрифтов). */
+  posterScale() { return this.dpr() }
   canvasFor() {
     const c = this.pool.pop() || document.createElement('canvas')
     const ts = this.posterScale(), w = Math.round(innerWidth * ts), h = Math.round(innerHeight * ts)
@@ -206,7 +230,7 @@ export class Liquid {
   }
   repaint() {
     const was = this.mobile; this.mobile = isMobile()
-    if (was !== this.mobile) { this.maxQ = this.mobile ? 0.6 : 0.85; this.quality = Math.min(this.quality, this.maxQ); this.ceil = this.maxQ; this.size() }
+    if (was !== this.mobile) { this.maxQ = this.mobile ? 0.85 : 1.0; this.quality = Math.min(this.quality, this.maxQ); this.ceil = this.maxQ; this.size() }
     for (const c of this.cache.values()) this.release(c)
     this.cache.clear()
     if (this.draw) { this.cA = this.canvasFor(); this.paint(this.cA, this.draw); this.upload(0, this.cA) }
@@ -214,9 +238,16 @@ export class Liquid {
     this.schedule()
   }
   resize() { this.size(); this.repaint() }
-  paint(c, fn) { const ctx = c.getContext('2d'); ctx.setTransform(1, 0, 0, 1, 0, 0); fn(ctx, c.width, c.height, this.mobile) }
+  paint(c, fn) {
+    const ctx = c.getContext('2d')
+    ctx.setTransform(1, 0, 0, 1, 0, 0)
+    ctx.imageSmoothingEnabled = true
+    ctx.imageSmoothingQuality = 'high'
+    fn(ctx, c.width, c.height, this.mobile)
+  }
   setPoster(fn) {
     if (this.draw && this.draw !== fn) { this.cache.set(this.draw, this.cA) } else this.release(this.cA)
+    this.layout?.setChapter(this.chapter)
     this.draw = fn; this.cA = this.posterCanvas(fn); this.upload(0, this.cA)
   }
   transitionTo(fn, chapter) {
@@ -225,6 +256,7 @@ export class Liquid {
     this.trans = { draw: fn, start: performance.now(), dur: this.reduce ? 10 : 1500 }
     this.fr.hold = performance.now() + 250
     this.chapter = chapter
+    this.layout?.setChapter(this.chapter)
     this.splash(2.2)
   }
   finish() {
@@ -243,15 +275,20 @@ export class Liquid {
     if (this.want) this.prefetch(this.want)
   }
   setMouse(cx, cy) {
+    if(this.layout?.current?.bounded){this.mouse.active=false;return}
     const W = H * innerWidth / innerHeight
     this.mouse.x = (cx / innerWidth * 2 - 1) * W
     this.mouse.y = -(cy / innerHeight * 2 - 1) * H
     this.mouse.active = true
   }
   splash(power = 5) {
+    if(this.layout?.current?.bounded)return
     this.balls.forEach((b, i) => { if (!i) return; const a = Math.random() * 6.283; b.vx += Math.cos(a) * power; b.vy += Math.sin(a) * power; b.vz += (Math.random() - 0.5) * power })
   }
   targets(t) {
+    const layout=this.layout?.current
+    if(layout?.bounded){const geometry=mercuryGeometry(layout.bounds,t,this.chapter);this.shapeScale=geometry.scale;return geometry.targets}
+    this.shapeScale=1
     const asp = innerWidth / innerHeight, W = H * asp, m = this.mobile
     const s = m ? 0.62 : Math.min(1, Math.max(0.7, asp / 1.6))
     const R = [0.62, 0.44, 0.36, 0.3, 0.26, 0.22, 0.19, 0.16, 0.13].map((r) => r * s)
@@ -261,10 +298,11 @@ export class Liquid {
       const a = i * 2.4 + t * (0.18 + i * 0.045)
       let x, y, z = Math.sin(a) * 0.35, r = R[i]
       if (ch === 'home') {
-        // на телефоне опускаем ртуть под заголовок-постер: большой шар не должен накрывать «ЖИВОЕ»
-        const cx = m ? W * 0.25 : W * 0.4, cy = m ? -H * 0.42 : -H * 0.06
-        const d = (0.15 + i * 0.13) * s * (m ? 1.1 : 1.25)
-        x = cx + Math.cos(a) * d; y = cy + Math.sin(a) * d * (m ? 0.5 : 0.8)
+        // на телефоне ртуть парит в свободном окне между «ЖИВОЕ» и текстом описания
+        const cx = m ? W * 0.26 : W * 0.4, cy = m ? -H * 0.04 : -H * 0.06
+        const d = (0.15 + i * 0.13) * s * (m ? 0.65 : 1.25)
+        x = cx + Math.cos(a) * d; y = cy + Math.sin(a) * d * (m ? 0.35 : 0.8)
+        r *= m ? 0.6 : 1
       } else if (ch === 'services') {
         // ртутная лужа внизу слева — в свободной зоне под гигантскими словами: буквы не перекрываем
         if (i < 3) {
@@ -278,25 +316,29 @@ export class Liquid {
           y = -H * 0.9 + Math.sin(a) * 0.05 * H; r *= 0.7
         }
       } else if (ch === 'works') {
+        // на телефоне капли мягко текут под словом «РАБОТЫ» за карточками кейсов
         x = -W * 0.92 + (i / 8) * W * 1.84 + Math.sin(t * 0.6 + i) * 0.15
-        y = (m ? 0.62 : 0.55) * H + Math.sin(t * 0.9 + i * 0.8) * 0.2 * H
-        r = (0.16 + ((i * 37) % 9) / 9 * 0.24) * s * (m ? 1 : 1.3)
+        y = (m ? -0.15 : 0.55) * H + Math.sin(t * 0.8 + i) * (m ? 0.04 : 0.2) * H
+        r = (0.16 + ((i * 37) % 9) / 9 * 0.24) * s * (m ? 0.55 : 1.3)
       } else if (ch === 'process') {
-        const cx = m ? W * 0.55 : W * 0.62, cy = m ? H * 0.3 : H * 0.45
-        const d = (0.2 + i * 0.09) * s
-        x = cx + Math.cos(a * 0.7) * d * (m ? 1 : 1.6); y = cy + Math.sin(a) * d * 0.5; r *= m ? 0.45 : 0.8
+        // на телефоне ртуть располагается в просвете под «РАБОТАЮ» над шагами процесса
+        const cx = m ? W * 0.55 : W * 0.62, cy = m ? H * 0.14 : H * 0.45
+        const d = (0.2 + i * 0.09) * s * (m ? 0.7 : 1)
+        x = cx + Math.cos(a * 0.7) * d * (m ? 0.8 : 1.6); y = cy + Math.sin(a * 0.7) * d * 0.4; r *= m ? 0.36 : 0.8
       } else if (ch === 'reviews') {
         const cx = m ? W * 0.45 : W * 0.66, cy = m ? H * 0.2 : H * 0.36
         const aa = i / 9 * 6.283 + t * 0.2
         x = cx + Math.cos(aa) * 0.45 * s * (m ? 1.6 : 1); y = cy + Math.sin(aa) * 0.3 * s * (m ? 0.4 : 1); r *= (i % 3 ? 0.6 : 0.95) * (m ? 0.55 : 1)
       } else if (ch === 'about') {
-        const cx = m ? 0 : W * 0.48, cy = m ? -H * 0.45 : 0
-        const rr = (m ? 0.55 : 0.85) * s
+        // на телефоне шар компактно парит справа в чистой зоне: цифры 40+, 24/7 и теги остаются кристально чистыми
+        const cx = m ? W * 0.52 : W * 0.48, cy = m ? H * 0.14 : 0
+        const rr = (m ? 0.3 : 0.85) * s
         const aa = i / 9 * 6.283 + t * 0.25
-        x = cx + Math.cos(aa) * rr * 1.2; y = cy + Math.sin(aa) * rr; z = Math.sin(aa * 2 + t) * 0.4; r *= 0.75
+        x = cx + Math.cos(aa) * rr * (m ? 0.9 : 1.2); y = cy + Math.sin(aa) * rr; z = Math.sin(aa * 2 + t) * 0.4; r *= m ? 0.38 : 0.75
       } else {
-        const cx = m ? W * 0.45 : W * 0.52, cy = m ? H * 0.72 : H * 0.05
-        x = cx + Math.cos(a) * 0.32 * s; y = cy + Math.sin(a) * 0.28 * s; r = (0.42 + (i % 3) * 0.1) * s * (m ? 0.7 : 1)
+        // контакт: парит в середине между заголовком и формой/кнопками
+        const cx = m ? W * 0.36 : W * 0.52, cy = m ? H * 0.04 : H * 0.05
+        x = cx + Math.cos(a) * 0.32 * s * (m ? 0.65 : 1); y = cy + Math.sin(a) * 0.28 * s * (m ? 0.65 : 1); r = (0.42 + (i % 3) * 0.1) * s * (m ? 0.45 : 1)
       }
       out.push([x, y, z, r])
     }
@@ -337,24 +379,32 @@ export class Liquid {
       if (i === 0) {
         if (this.mouse.active) { tx = this.mouse.x; ty = this.mouse.y } else {
           // в простое шар-курсор прилипает к первой капле; на «Услугах» — внутрь лужи, чтобы не задираться к буквам
-          const oy = this.chapter === 'services' ? -0.15 : 0.5
-          tx = tg[0][0] - 0.9; ty = tg[0][1] + oy
+          const oy = this.chapter === 'services' ? -0.15 : (this.mobile ? 0 : 0.5)
+          tx = this.mobile ? tg[0][0] : tg[0][0] - 0.9; ty = tg[0][1] + oy
         }
         tz = 0.3; tr = (this.chapter === 'contact' ? 0.42 : 0.3) * (this.mobile ? 0.7 : 1)
       } else [tx, ty, tz, tr] = tg[i - 1]
+      if(this.layout?.current?.bounded && i===0){[tx,ty,tz,tr]=tg[0];tr*=.45}
+      if(this.snapScene){b.x=tx;b.y=ty;b.z=tz;b.r=tr;b.vx=b.vy=b.vz=0}
       const k = i === 0 ? 14 : b.k
       b.vx += (tx - b.x) * k * dt; b.vy += (ty - b.y) * k * dt; b.vz += (tz - b.z) * k * dt
       const damp = Math.pow(i === 0 ? 0.02 : 0.12, dt)
       b.vx *= damp; b.vy *= damp; b.vz *= damp
       b.x += b.vx * dt; b.y += b.vy * dt; b.z += b.vz * dt
       b.r += (tr - b.r) * Math.min(1, dt * 3)
+      if(this.layout?.current?.bounded)constrainBall(b,this.layout.current.bounds,this.shapeScale)
       U[i * 4] = b.x; U[i * 4 + 1] = b.y; U[i * 4 + 2] = b.z; U[i * 4 + 3] = Math.max(0.01, b.r)
     })
+    this.snapScene=false
+    const layout=this.layout?.current
+    gl.uniform1f(this.L.bounded,layout?.bounded?1:0);gl.uniform1f(this.L.shape,this.shapeScale||1)
+    if(layout?.bounded){const c=layout.clip;gl.uniform4f(this.L.safe,c.x/innerWidth,1-(c.y+c.height)/innerHeight,(c.x+c.width)/innerWidth,1-c.y/innerHeight)}
+    else gl.uniform4f(this.L.safe,0,0,1,1)
     gl.uniform1f(this.L.time, t); gl.uniform1f(this.L.mix, this.mix); gl.uniform4fv(this.L.b, U)
     gl.drawArrays(gl.TRIANGLES, 0, 3)
   }
   destroy() {
-    this.stop(); clearTimeout(this.idleId); window.cancelIdleCallback?.(this.idleId); document.removeEventListener('visibilitychange', this.onVis); removeEventListener('resize', this.onResize)
+    this.layout?.destroy(); this.stop(); clearTimeout(this.idleId); window.cancelIdleCallback?.(this.idleId); document.removeEventListener('visibilitychange', this.onVis); removeEventListener('resize', this.onResize)
     this.canvas.removeEventListener('webglcontextlost', this.onLost); this.canvas.removeEventListener('webglcontextrestored', this.onRestored)
     this.gl?.getExtension('WEBGL_lose_context')?.loseContext(); this.el.innerHTML = ''
   }

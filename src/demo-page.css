@@ -10,7 +10,7 @@ button,input{font:inherit}
 .dp-foot{color:#a9b0b8}
 .dp-cta{flex:none;padding:13px 20px;border-radius:12px;background:var(--bd-c);color:#fff;font-weight:800;text-decoration:none;transition:filter .2s}
 .dp-cta:hover{filter:brightness(1.08)}
-@media (max-width:760px){
+@media (max-width:1280px), (max-height:800px){
   .dp{height:auto;min-height:100dvh}
   .dp-top{padding:10px 14px;font-size:12.5px}
   .dp-main{padding:0;display:block}
@@ -18,3 +18,5 @@ button,input{font:inherit}
   .dp-foot{flex-direction:column;align-items:stretch;padding:12px 14px calc(12px + env(safe-area-inset-bottom));text-align:center;font-size:12.5px;position:sticky;bottom:0;background:#14171b}
   .dp-foot span{display:none}
 }
+
+@media (max-width:359px){.dp-top{flex-wrap:wrap;gap:6px}.dp-top a{min-height:44px;display:flex;align-items:center}}

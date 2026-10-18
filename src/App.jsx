@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback, useLayoutEffect } from 'react'
 import { createStage, hasGL } from './stage.js'
 import { posters, chapters } from './posters.js'
 import { profile, services, projects, process, pricing, reviews, site } from './config.js'
 import Mascot from './Mascot.jsx'
 import Demo from './demos/index.jsx'
 import { useFocusTrap } from './a11y.js'
+import { isMobile } from './mq.js'
 
 const IDS = chapters.map((c) => c.id)
 const slugOf = (p, i) => p.slug || `slot-${i + 1}`
@@ -15,6 +16,7 @@ const parseHash = () => {
 const Badge = ({ on }) => (on && site.showDemoBadges ? <span className="demo-badge" title="Пример — замени на свой">демо</span> : null)
 
 const Drip = ({ text, delay = 0, className = '' }) => {
+  if (!text) return null
   const words = text.split(' ')
   const long = text.length > 40
   let n = 0
@@ -30,6 +32,41 @@ const Drip = ({ text, delay = 0, className = '' }) => {
       ))}
     </span>
   )
+}
+
+/* Узкие экраны: видимые основные разделы + явное раскрытие остальных. */
+function ChapterNav({ chapter, go, blocked }) {
+  const [expanded, setExpanded] = useState(false)
+  const root = useRef(null), more = useRef(null), extra = useRef(null)
+  const close = (restore = false) => { setExpanded(false); if (restore) more.current?.focus({ preventScroll: true }) }
+  useEffect(() => { setExpanded(false) }, [chapter, blocked])
+  useEffect(() => {
+    const mq = matchMedia('(max-width:639px)')
+    const resize = () => { if (!mq.matches) setExpanded(false) }
+    mq.addEventListener('change', resize)
+    return () => mq.removeEventListener('change', resize)
+  }, [])
+  useLayoutEffect(() => {
+    if (!expanded) return
+    const frame = requestAnimationFrame(() => extra.current?.querySelector('button')?.focus({ preventScroll: true }))
+    const outside = e => { if (!root.current?.contains(e.target)) setExpanded(false) }
+    const escape = e => { if (e.key === 'Escape') { e.preventDefault(); close(true) } }
+    document.addEventListener('pointerdown', outside)
+    document.addEventListener('keydown', escape)
+    return () => { cancelAnimationFrame(frame); document.removeEventListener('pointerdown', outside); document.removeEventListener('keydown', escape) }
+  }, [expanded])
+  const choose = i => { setExpanded(false); go(i, { queue: true }); if (i >= 3) requestAnimationFrame(() => more.current?.focus({ preventScroll: true })) }
+  return <nav ref={root} className="nav" aria-label="Разделы">
+    {chapters.map((c,i) => <button key={c.id} className={`${chapter === i ? 'on' : ''} ${i >= 3 ? 'nav-secondary' : ''}`} onClick={() => choose(i)} aria-current={chapter === i ? 'step' : undefined}>
+      <i aria-hidden="true">0{i + 1}</i><span>{c.name}</span>
+    </button>)}
+    <button ref={more} className={`nav-more ${chapter >= 3 ? 'on' : ''}`} aria-expanded={expanded} aria-controls="nav-extra" aria-label={chapter >= 3 ? `Ещё разделы. Текущий: ${chapters[chapter].name}` : 'Ещё разделы'} onClick={() => setExpanded(v => !v)}>
+      <span>{chapter >= 3 ? chapters[chapter].name : 'Ещё'}</span><svg aria-hidden="true" width="10" height="10" viewBox="0 0 10 10"><path d={expanded ? 'm2 3 3 3 3-3' : 'm2 6 3-3 3 3'} fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
+    </button>
+    {expanded && <div ref={extra} className="nav-extra" id="nav-extra" aria-label="Дополнительные разделы">
+      {chapters.slice(3).map((c,j) => <button key={c.id} className={chapter === j+3 ? 'on' : ''} aria-current={chapter === j+3 ? 'step' : undefined} onClick={() => choose(j+3)}>{c.name}</button>)}
+    </div>}
+  </nav>
 }
 
 export default function App() {
@@ -92,7 +129,7 @@ export default function App() {
   useEffect(() => {
     const l = liquid.current; if (!l?.pause) return
     // на телефоне чат-бриф раскрывается на весь экран — там ртуть тоже не видна
-    const covered = openCase || (chat.open && matchMedia('(max-width: 760px)').matches)
+    const covered = openCase || (chat.open && isMobile())
     if (!covered) { l.resume(); return }
     const t = setTimeout(() => l.pause(), openCase ? 1100 : 500)
     return () => clearTimeout(t)
@@ -123,25 +160,38 @@ export default function App() {
     const sync = () => {
       const { i, slug } = parseHash()
       if (!slug) setOpenCase(null)
-      else { const k = projects.findIndex((p, n) => slugOf(p, n) === slug); if (k >= 0) setOpenCase((c) => c || { ...projects[k], idx: k, ox: innerWidth / 2, oy: innerHeight / 2 }) }
+      else { const k = projects.findIndex((p, n) => slugOf(p, n) === slug); if (k >= 0) setOpenCase((c) => c?.idx === k ? c : { ...projects[k], idx: k, ox: innerWidth / 2, oy: innerHeight / 2 }) }
       go(i, { fromHash: true })
     }
     addEventListener('popstate', sync)
-    return () => removeEventListener('popstate', sync)
+    addEventListener('hashchange', sync)
+    return () => { removeEventListener('popstate', sync); removeEventListener('hashchange', sync) }
   }, [go])
 
   const showCase = (c) => { history.pushState({ case: 1 }, '', `#works/${slugOf(c, c.idx)}`); setOpenCase(c) }
   const closeCase = () => { if (history.state?.case) history.back(); else { history.replaceState(null, '', `#${IDS[chRef.current]}`); setOpenCase(null) } }
   const openChat = (prefill = null) => { if (openCase) closeCase(); setChat({ open: true, prefill }) }
-  const openType = (type) => { const i = projects.findIndex((p) => p.type === type && p.title); if (i >= 0) showCase({ ...projects[i], idx: i, ox: innerWidth / 2, oy: innerHeight / 2 }) }
+  const openType = (type) => { const q = type.toLowerCase(); const i = projects.findIndex((p) => p.title && (p.type === type || p.type?.toLowerCase().includes(q))); if (i >= 0) showCase({ ...projects[i], idx: i, ox: innerWidth / 2, oy: innerHeight / 2 }) }
 
   /* input */
   useEffect(() => {
-    const busy = (e) => overlay || e.target.closest?.('input,textarea,.chat,.case')
+    const busy = (e) => overlay || chat.open || e.target.closest?.('input,textarea,select,.chat,.case')
     let acc = 0, accT = 0
     const onWheel = (e) => {
-      if (busy(e)) return
-      if (e.target.closest('.hscroll') && Math.abs(e.deltaX) > Math.abs(e.deltaY)) return
+      if (busy(e) || isMobile()) return // Native chapter scrolling; use the labelled navigation to change chapters.
+      const hs = e.target.closest?.('.hscroll')
+      if (hs) {
+        if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return
+        const maxScroll = hs.scrollWidth - hs.clientWidth
+        if (maxScroll > 10) {
+          const atStart = hs.scrollLeft <= 5 && e.deltaY < 0
+          const atEnd = hs.scrollLeft >= maxScroll - 5 && e.deltaY > 0
+          if (!atStart && !atEnd) {
+            if (!hs.classList.contains('reel')) hs.scrollLeft += e.deltaY
+            return
+          }
+        }
+      }
       const now = performance.now(); if (now - accT > 220) acc = 0; accT = now
       acc += e.deltaY
       if (Math.abs(acc) > 60) { go(chRef.current + Math.sign(acc)); acc = 0 }
@@ -150,14 +200,14 @@ export default function App() {
     const onTouchStart = (e) => { ty = e.touches[0].clientY; tx = e.touches[0].clientX }
     const onTouchMove = (e) => { liquid.current?.setMouse(e.touches[0].clientX, e.touches[0].clientY) }
     const onTouchEnd = (e) => {
-      if (ty == null || busy(e)) return
+      if (ty == null || busy(e) || isMobile()) { ty = null; return }
       const dy = ty - e.changedTouches[0].clientY, dx = tx - e.changedTouches[0].clientX
       if (Math.abs(dy) > 55 && Math.abs(dy) > Math.abs(dx) * 1.3) go(chRef.current + Math.sign(dy))
       ty = null
     }
     const onKey = (e) => {
       if (e.key === 'Escape') { if (openCase) closeCase(); else if (chat.open) setChat((c) => ({ ...c, open: false })) }
-      if (busy(e)) return
+      if (busy(e) || isMobile()) return
       if (e.key === ' ' && e.target.closest?.('button,a,[role=button]')) return
       if (['ArrowDown', 'PageDown', ' '].includes(e.key)) { e.preventDefault(); go(chRef.current + 1) }
       if (['ArrowUp', 'PageUp'].includes(e.key)) { e.preventDefault(); go(chRef.current - 1) }
@@ -172,35 +222,59 @@ export default function App() {
     return () => { removeEventListener('wheel', onWheel); removeEventListener('touchstart', onTouchStart); removeEventListener('touchmove', onTouchMove); removeEventListener('touchend', onTouchEnd); removeEventListener('keydown', onKey); removeEventListener('pointermove', onMove) }
   }, [go, openCase, chat.open, overlay])
 
+  useEffect(() => {
+    if (!chat.open) return
+    const viewport = window.visualViewport
+    const update = () => {
+      document.documentElement.style.setProperty('--visual-height', `${viewport?.height || innerHeight}px`)
+      document.documentElement.style.setProperty('--visual-top', `${viewport?.offsetTop || 0}px`)
+      document.documentElement.style.setProperty('--visual-left', `${viewport?.offsetLeft || 0}px`)
+      document.documentElement.style.setProperty('--visual-width', `${viewport?.width || innerWidth}px`)
+    }
+    update()
+    viewport?.addEventListener('resize', update)
+    viewport?.addEventListener('scroll', update)
+    window.addEventListener('resize', update)
+    return () => {
+      viewport?.removeEventListener('resize', update)
+      viewport?.removeEventListener('scroll', update)
+      window.removeEventListener('resize', update)
+      for (const name of ['height', 'top', 'left', 'width']) document.documentElement.style.removeProperty(`--visual-${name}`)
+    }
+  }, [chat.open])
+
   const splash = (e) => { if (!e.target.closest('a,button,.reel,.case,.chat,.hscroll,input')) { const l = liquid.current; if (l?.lite) l.setMouse(e.clientX, e.clientY); l?.splash(6) } }
   const id = IDS[shown]
 
   return (
-    <div className={`app ${ready ? 'ready' : ''}`} onPointerDown={splash}>
+    <div className={`app ${ready ? 'ready' : ''} ${openCase ? 'case-open' : ''} ${chat.open ? 'chat-open' : ''}`} onPointerDown={splash}>
       <div className="stage" ref={stage} aria-hidden="true" />
       <Loader pct={loadPct} done={ready} />
 
-      <header className="top">
+      <header className="top" inert={overlay || chat.open}>
         <button className="logo" onClick={() => go(0, { queue: true })}><span className="logo-drop" />{profile.name}</button>
         {profile.availability && <span className="avail"><i />{profile.availability}</span>}
-        <nav className="nav" aria-label="Разделы">
-          {chapters.map((c, i) => (
-            <button key={c.id} className={chapter === i ? 'on' : ''} onClick={() => go(i, { queue: true })} aria-current={chapter === i ? 'step' : undefined}>
-              <i>0{i + 1}</i>{c.name}
-            </button>
-          ))}
-        </nav>
+        <ChapterNav chapter={chapter} go={go} blocked={overlay || chat.open} />
         <button className={`fx-toggle ${fx ? 'on' : ''}`} role="switch" aria-checked={fx} disabled={!canGL} onClick={() => toggleFx()}
           title={!canGL ? '3D недоступно на этом устройстве' : fx ? 'Выключить 3D — если сайт тормозит' : 'Включить живую 3D-ртуть'}>
           <span className="fx-track"><span className="fx-knob" /></span>3D
         </button>
-        <a className="top-cta" href={profile.telegram} target="_blank" rel="noreferrer">Telegram ↗</a>
+        <a className="top-cta" href={profile.telegram} target="_blank" rel="noreferrer" aria-label="Написать в Telegram">
+          <span className="cta-label">Telegram</span>
+          <span className="cta-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none">
+              <path d="m21 3-7 18-4-7-7-4L21 3Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/>
+              <path d="m10 14 5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+            </svg>
+          </span>
+        </a>
       </header>
 
       <div className="progress" aria-hidden="true"><span style={{ transform: `scaleY(${(chapter + 1) / chapters.length})` }} /></div>
       <div className="counter" aria-hidden="true"><b>0{chapter + 1}</b> / 0{chapters.length}</div>
 
-      <main className={`chapter ch-${id} ${leaving ? 'leaving' : ''} ${ready ? '' : 'wait'}`} key={shown}>
+      <main className={`chapter ch-${id} ${leaving ? 'leaving' : ''} ${ready ? '' : 'wait'}`} key={shown} tabIndex={0} aria-label={chapters[shown].name} inert={overlay || chat.open}>
+        <ChapterHeading id={id} />
         {id === 'home' && <Home go={go} openChat={openChat} />}
         {id === 'services' && <Services openType={openType} />}
         {id === 'works' && <Works onOpen={showCase} covered={overlay} />}
@@ -210,9 +284,9 @@ export default function App() {
         {id === 'contact' && <Contact openChat={openChat} />}
       </main>
 
-      {chapter < chapters.length - 1 && IDS[chapter] !== 'works' && <button className="next" onClick={() => go(chapter + 1)}><span>листай</span><i /></button>}
+      {chapter < chapters.length - 1 && IDS[chapter] !== 'works'  && <button className="next" onClick={() => go(chapter + 1)}><span>листай</span><i /></button>}
       {openCase && <Case data={openCase} onClose={closeCase}
-        onNext={() => { const k = (openCase.idx + 1) % projects.length; const c = { ...projects[k], idx: k, ox: innerWidth / 2, oy: innerHeight / 2 }; history.replaceState({ case: 1 }, '', `#works/${slugOf(c, k)}`); setOpenCase(c) }}
+        onNext={() => { const k = (openCase.idx + 1) % projects.length; const c = { ...projects[k], idx: k, ox: innerWidth / 2, oy: innerHeight / 2 }; history.replaceState(history.state, '', `#works/${slugOf(c, k)}`); setOpenCase(c) }}
         onContact={() => openChat({ type: openCase.type, ref: openCase.title || null })} />}
       {slowAsk && fx && (
         <div className="slow-ask" role="status">
@@ -223,9 +297,32 @@ export default function App() {
       )}
       {ready && <Mascot open={chat.open} prefill={chat.prefill} setOpen={(o) => (o ? openChat(chat.prefill) : setChat({ open: false, prefill: null }))}
         chapterId={IDS[chapter]} onGoWorks={() => go(IDS.indexOf('works'))} />}
-      {site.customCursor && <Cursor />}
+      {site.customCursor && <Cursor hidden={overlay} />}
     </div>
   )
+}
+
+// Unlike canvas lettering, this heading contributes its actual height to compact layout.
+function ChapterHeading({ id }) {
+  const headings = {
+    home: ['(01) — digital studio of one', ['ДЕЛАЮ', 'ЖИВОЕ']],
+    services: ['(02) — что делаю', ['САЙТЫ', 'БОТЫ', 'АВТОМАТИЗАЦИИ']],
+    works: [`(${String(projects.length).padStart(2, '0')}) — избранное`, ['РАБОТЫ']],
+    process: ['(04) — без сюрпризов', ['КАК Я', 'РАБОТАЮ']],
+    reviews: ['(05) — не я, а они', ['ГОВОРЯТ', 'КЛИЕНТЫ']],
+    about: ['(06) — человек за кодом', ['ЭТО', profile.name]],
+    contact: ['(07) — давай обсудим', ['НАПИШИ', 'МНЕ']],
+  }
+  const [label, lines] = headings[id]
+  const Heading = id === 'home' ? 'h1' : 'h2'
+  return <div className={`compact-heading title-${id}`}>
+    <p>{label}</p>
+    <Heading>{lines.map((text, i) => <span key={text} className={
+      (id === 'services' && i === 1) || id === 'works' || (id === 'process' && i === 0) || (id === 'reviews' && i === 1) || (id === 'about' && i === 0)
+        ? 'outlined' : i === 1 && id !== 'services' ? 'iridescent' : ''
+    }>{text}</span>)}</Heading>
+    <div className="scene-slot" data-chapter={id} aria-hidden="true" />
+  </div>
 }
 
 function Loader({ pct, done }) {
@@ -289,56 +386,171 @@ function Works({ onOpen, covered }) {
   }, [])
   useEffect(() => {
     const el = reel.current
-    let last = el.scrollLeft, v = 0, raf = 0
-    // наклон карточек от скорости скролла; цикл крутится только пока лента движется
-    const loop = () => {
-      const d = el.scrollLeft - last; last = el.scrollLeft
-      v += (d - v) * 0.15
-      if (Math.abs(v) < 0.05 && !d) v = 0
-      const sk = Math.round(Math.max(-12, Math.min(12, -v * 0.4)) * 4) / 4
-      if (sk !== el._sk) { el._sk = sk; el.style.setProperty('--skew', `${sk}deg`) }
-      raf = v || sk ? requestAnimationFrame(loop) : 0
+    if (!el) return
+
+    let currentX = el.scrollLeft
+    let targetX = el.scrollLeft
+    let smoothRaf = 0
+    let v = 0
+    let lastRotY = 0, lastScale = 1, lastShift = 0
+
+    const updateVisuals = (velocity) => {
+      const rotY = Math.round(Math.max(-13, Math.min(13, -velocity * 0.35)) * 10) / 10
+      const rotZ = Math.round(Math.max(-2, Math.min(2, -velocity * 0.05)) * 10) / 10
+      const scale = Math.round(Math.max(0.96, 1 - Math.min(0.04, Math.abs(velocity) * 0.0014)) * 1000) / 1000
+      const shift = Math.round(Math.max(-16, Math.min(16, velocity * 0.42)) * 10) / 10
+      const lift = Math.round(Math.min(6, Math.abs(velocity) * 0.1) * 10) / 10
+
+      if (rotY !== lastRotY || scale !== lastScale || shift !== lastShift) {
+        lastRotY = rotY; lastScale = scale; lastShift = shift
+        el.style.setProperty('--rot-y', `${rotY}deg`)
+        el.style.setProperty('--rot-z', `${rotZ}deg`)
+        el.style.setProperty('--card-scale', `${scale}`)
+        el.style.setProperty('--media-shift', `${shift}px`)
+        el.style.setProperty('--lift-y', `${-lift}px`)
+      }
     }
-    const kick = () => { if (!raf) raf = requestAnimationFrame(loop) }
-    el.addEventListener('scroll', kick, { passive: true })
-    let down = null
-    const pd = (e) => { if (e.pointerType !== 'mouse') return; down = { x: e.clientX, s: el.scrollLeft, moved: false } }
-    const pm = (e) => { if (!down) return; const dx = e.clientX - down.x; if (Math.abs(dx) > 5) down.moved = true; el.scrollLeft = down.s - dx }
-    const pu = () => { if (down?.moved) { el.dataset.dragged = '1'; setTimeout(() => delete el.dataset.dragged, 50) } down = null }
-    el.addEventListener('pointerdown', pd); addEventListener('pointermove', pm); addEventListener('pointerup', pu)
-    return () => { cancelAnimationFrame(raf); el.removeEventListener('scroll', kick); el.removeEventListener('pointerdown', pd); removeEventListener('pointermove', pm); removeEventListener('pointerup', pu)}
+
+    const startGlide = () => {
+      if (smoothRaf) return
+      const glide = () => {
+        const maxScroll = el.scrollWidth - el.clientWidth
+        targetX = Math.max(0, Math.min(maxScroll, targetX))
+        const diff = targetX - currentX
+
+        if (Math.abs(diff) > 0.3) {
+          const step = diff * 0.095
+          currentX += step
+          el.scrollLeft = currentX
+          v += (step - v) * 0.2
+          updateVisuals(v)
+          smoothRaf = requestAnimationFrame(glide)
+        } else {
+          currentX = targetX
+          el.scrollLeft = targetX
+          v *= 0.8
+          if (Math.abs(v) > 0.04) {
+            updateVisuals(v)
+            smoothRaf = requestAnimationFrame(glide)
+          } else {
+            v = 0
+            updateVisuals(0)
+            smoothRaf = 0
+          }
+        }
+      }
+      smoothRaf = requestAnimationFrame(glide)
+    }
+
+    // Обработчик колесика мыши над каруселью — плавный lerp вместо дискретных скачков
+    const onWheel = (e) => {
+      const maxScroll = el.scrollWidth - el.clientWidth
+      if (maxScroll <= 5) return
+
+      const delta = (Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY) * (e.deltaMode === 1 ? 33 : 1)
+      const atStart = currentX <= 4 && delta < 0
+      const atEnd = currentX >= maxScroll - 4 && delta > 0
+
+      if (atStart || atEnd) return
+
+      e.preventDefault()
+      e.stopPropagation()
+
+      targetX = Math.max(0, Math.min(maxScroll, targetX + delta * 1.15))
+      startGlide()
+    }
+
+    // Drag мышкой с плавной инерцией
+    let down = null, trackX = 0, trackT = 0, dragVel = 0
+    const pd = (e) => {
+      if (e.pointerType !== 'mouse') return
+      cancelAnimationFrame(smoothRaf)
+      smoothRaf = 0
+      currentX = el.scrollLeft
+      targetX = el.scrollLeft
+      trackX = e.clientX; trackT = performance.now(); dragVel = 0
+      down = { x: e.clientX, s: el.scrollLeft, moved: false }
+    }
+    const pm = (e) => {
+      if (!down) return
+      const now = performance.now(), dt = Math.max(1, now - trackT)
+      const stepDx = e.clientX - trackX
+      dragVel = dragVel * 0.6 + (stepDx / dt) * 0.4
+      trackX = e.clientX; trackT = now
+
+      const dx = e.clientX - down.x
+      if (Math.abs(dx) > 5) down.moved = true
+
+      const maxScroll = el.scrollWidth - el.clientWidth
+      currentX = Math.max(0, Math.min(maxScroll, down.s - dx))
+      targetX = currentX
+      el.scrollLeft = currentX
+
+      v = v * 0.7 - stepDx * 0.35
+      updateVisuals(v)
+    }
+    const pu = () => {
+      if (down?.moved) {
+        el.dataset.dragged = '1'
+        setTimeout(() => delete el.dataset.dragged, 60)
+
+        if (Math.abs(dragVel) > 0.18) {
+          const maxScroll = el.scrollWidth - el.clientWidth
+          const coast = -dragVel * 240
+          targetX = Math.max(0, Math.min(maxScroll, currentX + coast))
+          startGlide()
+        } else {
+          startGlide()
+        }
+      }
+      down = null
+    }
+
+    let nativeLast = el.scrollLeft
+    const onScroll = () => {
+      if (!smoothRaf && !down) {
+        const d = el.scrollLeft - nativeLast
+        nativeLast = el.scrollLeft
+        currentX = targetX = el.scrollLeft
+        v += (d - v) * 0.2
+        updateVisuals(v)
+      } else {
+        nativeLast = el.scrollLeft
+      }
+    }
+
+    el.addEventListener('wheel', onWheel, { passive: false })
+    el.addEventListener('scroll', onScroll, { passive: true })
+    el.addEventListener('pointerdown', pd)
+    addEventListener('pointermove', pm)
+    addEventListener('pointerup', pu)
+    addEventListener('pointercancel', pu)
+
+    return () => {
+      cancelAnimationFrame(smoothRaf)
+      el.removeEventListener('wheel', onWheel)
+      el.removeEventListener('scroll', onScroll)
+      el.removeEventListener('pointerdown', pd)
+      removeEventListener('pointermove', pm)
+      removeEventListener('pointerup', pu)
+      removeEventListener('pointercancel', pu)
+    }
   }, [])
-  const melt = (img) => {
-    if (!img) return
-    const disp = document.querySelector('#melt feDisplacementMap')
-    const t0 = performance.now()
-    img.classList.add('melting')
-    const step = (now) => {
-      const p = Math.min(1, (now - t0) / 900)
-      disp.setAttribute('scale', String(70 * (1 - p) * (1 - p)))
-      if (p < 1) requestAnimationFrame(step); else img.classList.remove('melting')
-    }
-    requestAnimationFrame(step)
-  }
   return (
     <>
       <h2 className="sr">Работы</h2>
-      <svg width="0" height="0" style={{ position: 'absolute' }} aria-hidden="true">
-        <filter id="melt"><feTurbulence type="fractalNoise" baseFrequency="0.008 0.03" numOctaves="2" seed="3" /><feDisplacementMap in="SourceGraphic" scale="0" xChannelSelector="R" yChannelSelector="G" /></filter>
-      </svg>
       <div className="reel hscroll" ref={reel} data-cursor="тяни">
         {projects.map((p, i) => {
           const empty = !p.title
           return (
             <div key={i} data-i={i} className={`card ${empty ? 'empty' : ''}`} style={{ animationDelay: `${i * 70}ms` }} role="button" tabIndex={0}
               aria-label={empty ? `Свободный слот ${i + 1}` : `Открыть кейс ${p.title}`}
-              onPointerEnter={(e) => !p.demo && melt(e.currentTarget.querySelector('.card-media'))}
               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); onOpen({ ...p, idx: i, ox: innerWidth / 2, oy: innerHeight / 2 }) } }}
               onClick={(e) => { if (reel.current.dataset.dragged) return; onOpen({ ...p, idx: i, ox: e.clientX, oy: e.clientY }) }}
-              data-cursor={empty ? 'слот' : p.demo ? 'потыкать' : 'открыть'}>
-              <div className={`card-media ${p.demo ? 'is-demo' : ''} ${p.demo && (covered || !vis.has(i)) ? 'paused' : ''}`}>
-                {p.demo ? <Demo kind={p.demo} mini paused={covered || !vis.has(i)} /> : p.video ? <video src={p.video} autoPlay muted loop playsInline /> : <img src={p.image || p.cover} alt="" draggable="false" loading="lazy" />}
-                {p.demo && <span className="live-chip"><i />live demo</span>}
+              data-cursor={empty ? 'слот' : (p.demo || p.iframe) ? 'потыкать' : 'открыть'}>
+              <div className={`card-media ${(p.demo || p.iframe) ? 'is-demo' : ''} ${p.demo && (covered || !vis.has(i)) ? 'paused' : ''}`}>
+                {p.demo ? <Demo kind={p.demo} mini paused={covered || !vis.has(i)} /> : p.video ? <video src={p.video} poster={p.image || p.cover} autoPlay muted loop playsInline /> : <img src={p.image || p.cover} alt="" draggable="false" loading="lazy" />}
+                {(p.demo || p.iframe) && <span className="live-chip"><i />{p.chipLabel || (p.type === '3D-сайт' ? '3D проект' : p.iframe ? 'живой сайт' : 'интерактив')}</span>}
               </div>
               <div className="card-meta">
                 <span>{String(i + 1).padStart(2, '0')} <Badge on={p.isDemo} /></span>
@@ -358,18 +570,30 @@ function Works({ onOpen, covered }) {
 function Case({ data, onClose, onContact, onNext }) {
   const ref = useRef(null)
   useFocusTrap(ref, true, onClose)
+
+  useEffect(() => {
+    ref.current?.scrollTo({ top: 0, behavior: 'instant' })
+    const info = ref.current?.querySelector('.case-info')
+    info?.scrollTo({ top: 0, behavior: 'instant' })
+  }, [data.idx])
+
   const empty = !data.title
   return (
-    <div ref={ref} className={`case ${data.demo ? 'has-demo' : ''}`} role="dialog" aria-modal="true" aria-label={empty ? 'Свободный слот' : data.title} style={{ '--ox': `${data.ox}px`, '--oy': `${data.oy}px` }} key={data.idx}>
+    <div ref={ref} className={`case ${data.demo ? 'has-demo' : ''} ${data.iframe ? 'has-iframe' : ''}`} role="dialog" aria-modal="true" aria-label={empty ? 'Свободный слот' : data.title} style={{ '--ox': `${data.ox}px`, '--oy': `${data.oy}px` }} key={data.idx}>
       <button className="case-close" onClick={onClose} aria-label="Закрыть"><svg width="18" height="18" viewBox="0 0 18 18"><path d="M3 3l12 12M15 3L3 15" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" /></svg></button>
-      <div className={`case-media ${data.demo ? `demo-${data.demo}` : ''}`}>
-        {data.demo ? <Demo kind={data.demo} /> : data.video ? <video src={data.video} autoPlay muted loop playsInline controls /> : <img src={data.image || data.cover} alt="" />}
-        {data.demo && <span className="case-try">Это живое демо — потыкай ↓</span>}
+      <div className={`case-media ${data.demo ? `demo-${data.demo}` : ''} ${data.iframe ? 'is-iframe' : ''}`}>
+        {data.iframe ? (
+          <>
+            <iframe src={data.iframe} title={data.title} className="case-iframe" />
+            <span className="case-try">{data.tryLabel || 'Интерактивный проект — покрути и потыкай ↓'}</span>
+          </>
+        ) : data.demo ? <Demo kind={data.demo} /> : data.video ? <video src={data.video} poster={data.image || data.cover} autoPlay muted loop playsInline controls /> : <img src={data.image || data.cover} alt="" />}
+        {data.demo && <span className="case-try">{data.tryLabel || 'Интерактивный проект — потыкай ↓'}</span>}
       </div>
       <div className="case-info">
         <div className="case-meta"><span>{String(data.idx + 1).padStart(2, '0')}</span><span>{data.type}</span>{data.year && <span>{data.year}</span>}<Badge on={data.isDemo} /></div>
         <h2><Drip text={empty ? 'Этот слот ждёт' : data.title} delay={350} /></h2>
-        <p className="case-desc">{empty ? 'Я держу это место под следующий громкий проект. Возможно — под твой. Расскажи задачу, и через пару недель здесь будет кейс.' : data.desc}</p>
+        <p className="case-desc">{empty ? 'Я держу это место под следующий громкий проект. Возможно — под твой. Расскажи задачу, и уже через несколько дней здесь будет кейс.' : data.desc}</p>
         {!empty && (data.task || data.solution || data.result) && (
           <dl className="case-tsr">
             {data.task && <div><dt>Задача</dt><dd>{data.task}</dd></div>}
@@ -424,7 +648,7 @@ function Reviews() {
       <div className="revs hscroll">
         {reviews.map((r, i) => (
           <figure key={r.name} className="rev glass" style={{ animationDelay: `${150 + i * 120}ms` }}>
-            <Badge on={r.demo} />
+            <div className="rev-stars" aria-label={`Оценка ${r.rating || 5} из 5`}>{'★'.repeat(r.rating || 5)}</div>
             <span className="rev-q" aria-hidden="true">“</span>
             <blockquote>{r.text}</blockquote>
             <figcaption><span className="rev-ava">{r.name.split(' ').map((w) => w[0]).join('')}</span><div><b>{r.name}</b><small>{r.role}</small></div></figcaption>
@@ -459,8 +683,8 @@ function Contact({ openChat }) {
   const links = [
     { k: 'Telegram', v: profile.telegramLabel, href: profile.telegram },
     { k: 'Email', v: profile.email, href: `mailto:${profile.email}` },
-    { k: 'GitHub', v: profile.github.replace('https://', ''), href: profile.github },
-  ]
+    profile.github ? { k: 'GitHub', v: profile.github.replace('https://', ''), href: profile.github } : null,
+  ].filter(Boolean)
   return (
     <>
       <h2 className="sr">Контакт</h2>
@@ -468,7 +692,13 @@ function Contact({ openChat }) {
         <p className="lead"><Drip text="Есть идея, рутина или бизнес, которому нужен вау-эффект? Отвечаю в течение дня." delay={150} /></p>
         <div className="row">
           <button className="btn chrome big" onClick={() => openChat()}>Бриф за 1 минуту</button>
-          <a className="btn line big" href={profile.telegram} target="_blank" rel="noreferrer">Telegram ↗</a>
+          <a className="btn line big btn-tg" href={profile.telegram} target="_blank" rel="noreferrer">
+            <span>Telegram</span>
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" aria-hidden="true">
+              <path d="m21 3-7 18-4-7-7-4L21 3Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/>
+              <path d="m10 14 5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+            </svg>
+          </a>
         </div>
         <div className="links">
           {links.map((l, i) => <a key={l.k} href={l.href} {...(l.href.startsWith('mailto:') ? {} : { target: '_blank', rel: 'noreferrer' })} style={{ animationDelay: `${300 + i * 90}ms` }}><span>{l.k}</span><b>{l.v}</b></a>)}
@@ -479,31 +709,78 @@ function Contact({ openChat }) {
   )
 }
 
-function Cursor() {
+function Cursor({ hidden }) {
   const ref = useRef(null)
-  const [label, setLabel] = useState('')
+  const spanRef = useRef(null)
+
   useEffect(() => {
-    let x = -100, y = -100, cx = x, cy = y, raf = 0, tgt = null
-    // цикл догоняет мышь и засыпает, когда курсор встал; подписи/классы меняем только при смене цели
+    if (hidden) {
+      ref.current?.classList.add('hidden')
+      if (spanRef.current) spanRef.current.textContent = ''
+    }
+  }, [hidden])
+
+  useEffect(() => {
+    let x = -100, y = -100, cx = x, cy = y, raf = 0
     const loop = () => {
       cx += (x - cx) * 0.25; cy += (y - cy) * 0.25
       if (Math.abs(x - cx) < 0.1 && Math.abs(y - cy) < 0.1) { cx = x; cy = y; raf = 0 } else raf = requestAnimationFrame(loop)
       if (ref.current) ref.current.style.transform = `translate(${cx}px,${cy}px)`
     }
+    const updateTarget = (el) => {
+      if (!el) return
+      // Когда открыт кейс (особенно с 3D/iframe), чат или поле ввода — скрываем кастомный шарик
+      if (hidden || el.closest?.('.case, .chat, iframe, input, textarea')) {
+        ref.current?.classList.add('hidden')
+        if (spanRef.current) spanRef.current.textContent = ''
+        return
+      }
+
+      ref.current?.classList.remove('hidden')
+      const t = el.closest?.('[data-cursor],a,button')
+      const txt = el.closest?.('input,textarea,.chat')
+      const label = t && !txt ? (t.dataset.cursor || '') : ''
+      if (spanRef.current && spanRef.current.textContent !== label) spanRef.current.textContent = label
+      ref.current?.classList.toggle('has-label', !!label)
+      ref.current?.classList.toggle('hover', !!t && !txt)
+      ref.current?.classList.toggle('text', !!txt)
+    }
+
     const mv = (e) => {
       if (e.pointerType !== 'mouse') return
       x = e.clientX; y = e.clientY
       if (!raf) raf = requestAnimationFrame(loop)
-      if (e.target === tgt) return
-      tgt = e.target
-      const t = e.target.closest?.('[data-cursor],a,button')
-      const txt = e.target.closest?.('input,textarea,.chat')
-      setLabel(t && !txt ? (t.dataset.cursor || '') : '')
-      ref.current?.classList.toggle('hover', !!t && !txt)
-      ref.current?.classList.toggle('text', !!txt)
+      updateTarget(e.target)
     }
+
+    const refresh = () => {
+      if (x >= 0 && y >= 0) {
+        requestAnimationFrame(() => {
+          const el = document.elementFromPoint(x, y)
+          if (el) updateTarget(el)
+        })
+      }
+    }
+
+    const onLeave = () => { ref.current?.classList.add('hidden') }
+    const onBlur = () => { ref.current?.classList.add('hidden') }
+
     addEventListener('pointermove', mv)
-    return () => { removeEventListener('pointermove', mv); cancelAnimationFrame(raf) }
-  }, [])
-  return <div className="cursor" ref={ref} aria-hidden="true"><span>{label}</span></div>
+    addEventListener('click', refresh)
+    document.addEventListener('mouseleave', onLeave)
+    window.addEventListener('blur', onBlur)
+    return () => {
+      removeEventListener('pointermove', mv)
+      removeEventListener('click', refresh)
+      document.removeEventListener('mouseleave', onLeave)
+      window.removeEventListener('blur', onBlur)
+      cancelAnimationFrame(raf)
+    }
+  }, [hidden])
+
+  return (
+    <div className={`cursor ${hidden ? 'hidden' : ''}`} ref={ref} aria-hidden="true">
+      <span ref={spanRef} />
+    </div>
+  )
 }

@@ -129,7 +129,7 @@ function Calc({ mini, paused, onLead }) {
         ) : (
           <div className="bd-ok">✅ Готово! Смета придёт в течение 15 минут.<small>Заявка уже у менеджера — загляни в «Панель».</small><button onClick={() => { setSent(false); setForm({ name: '', phone: '' }) }}>Посчитать ещё</button></div>
         )}
-        {!mini && <div className="bd-note">Демо: данные никуда не отправляются</div>}
+        {!mini && <div className="bd-note">Тестовый режим: заявка попадает во вкладку «Панель»</div>}
       </div>
     </div>
   )

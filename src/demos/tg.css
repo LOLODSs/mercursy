@@ -32,3 +32,6 @@
 .tg.mini{width:100%;height:100%;border-radius:0;border:0;box-shadow:none;font-size:12px}
 .tg.mini .tg-head{padding:9px 12px}.tg.mini .tg-ava{width:30px;height:30px;font-size:11px}.tg.mini .tg-head b{font-size:13px}
 .tg.mini .tg-kb button{font-size:11.5px;padding:7px 8px}.tg.mini .tg-input{display:none}.tg.mini .tg-back{display:none}
+
+/* Full interactive bots need comfortable touch targets; miniatures stay compact. */
+.tg:not(.mini) .tg-kb button{min-height:44px}

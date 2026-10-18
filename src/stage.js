@@ -1,4 +1,5 @@
 import { isMobile } from './mq.js'
+import { SceneLayout, liteObjects } from './scene-layout.js'
 /* Создаёт сцену: живая ртуть на WebGL (чистый WebGL, грузится отдельным чанком),
    а если WebGL нет / включён лёгкий режим — постер на canvas с CSS-каплями. */
 
@@ -22,15 +23,6 @@ const SPOTS = {
   about: [[66, 30, 1.1], [84, 18, 0.9], [58, 70, 1]],
   contact: [[60, 26, 1.3], [80, 66, 1], [46, 72, 1]],
 }
-const SPOTS_M = {
-  home: [[62, 62, 0.9], [14, 54, 0.8], [86, 56, 1]],
-  services: [[60, 6, 0.75], [10, 30, 0.8], [86, 22, 1]],
-  works: [[64, 4, 0.6], [14, 14, 0.7], [88, 16, 1]],
-  process: [[58, 6, 0.7], [12, 24, 0.8], [86, 30, 1]],
-  reviews: [[60, 8, 0.75], [14, 30, 0.7], [86, 36, 1]],
-  about: [[56, 10, 0.85], [12, 34, 0.8], [86, 42, 1]],
-  contact: [[50, 14, 1], [12, 46, 0.8], [84, 52, 1]],
-}
 class LiteStage {
   constructor(el) {
     this.el = el; this.fallback = true; this.lite = true
@@ -44,9 +36,10 @@ class LiteStage {
     this.chapter = 'home'; this.mouse = { x: innerWidth / 2, y: innerHeight / 2 }
     let rt; this.resize = () => { clearTimeout(rt); rt = setTimeout(() => { this.cache.clear(); if (this.draw) this.show(this.draw, true); this.place() }, 150) }
     addEventListener('resize', this.resize)
+    this.layout = new SceneLayout(() => this.place())
     this.place()
   }
-  scale() { return Math.min(devicePixelRatio || 1, 1.5) }
+  scale() { return Math.min(Math.max(devicePixelRatio || 1, 1.5), 2) }
   canvasFor(fn) {
     let c = this.cache.get(fn)
     if (!c) {
@@ -67,12 +60,25 @@ class LiteStage {
       .onfinish = () => { if (this.cur !== old) old.remove() }
   }
   place() {
-    const S = (isMobile() ? SPOTS_M : SPOTS)[this.chapter] || SPOTS.home
+    const layout=this.layout?.current
+    this.drops.classList.toggle('bounded',!!layout?.bounded)
+    if(layout?.bounded)this.lm.style.transform=''
+    if(layout?.bounded){
+      const {clip,bounds}=layout, objects=liteObjects(bounds)
+      this.drops.style.clipPath=`inset(${clip.y}px ${Math.max(0,innerWidth-clip.x-clip.width)}px ${Math.max(0,innerHeight-clip.y-clip.height)}px ${clip.x}px)`
+      this.drops.style.visibility=clip.width&&clip.height?'visible':'hidden'
+      this.lq.forEach((d,i)=>{const b=objects[i];d.style.setProperty('--s',`${b.size}px`);d.style.transform=`translate3d(${b.x}px,${b.y}px,0)`})
+      return
+    }
+    this.drops.style.clipPath='';this.drops.style.visibility=''
+    this.lq.forEach(d=>d.style.removeProperty('--s'))
+    const S = SPOTS[this.chapter] || SPOTS.home
     this.lq.forEach((d, i) => { const [x, y, k] = S[i]; d.style.transform = `translate3d(${x}vw,${y}vh,0) scale(${k})` })
   }
-  setPoster(fn) { this.draw = fn; this.show(fn, true); this.place() }
+  setPoster(fn) { this.layout?.setChapter(this.chapter); this.draw = fn; this.show(fn, true); this.place() }
   transitionTo(fn, id) {
     this.draw = fn; this.chapter = id || this.chapter; this.el.dataset.ch = this.chapter
+    this.layout?.setChapter(this.chapter)
     this.place(); this.show(fn)
   }
   prefetch(fns) {
@@ -82,6 +88,7 @@ class LiteStage {
     next()
   }
   setMouse(x, y) {
+    if(this.layout?.current?.bounded)return
     this.mouse = { x, y }
     if (this.mr) return
     this.mr = requestAnimationFrame(() => {
@@ -92,7 +99,7 @@ class LiteStage {
     })
   }
   splash(power = 5) {
-    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    if (this.layout?.current?.bounded || matchMedia('(prefers-reduced-motion: reduce)').matches) return
     const n = Math.round(4 + power), { x, y } = this.mouse
     for (let i = 0; i < n; i++) {
       const s = document.createElement('i'); s.className = 'lq-spl'
@@ -106,7 +113,7 @@ class LiteStage {
     }
   }
   destroy() {
-    removeEventListener('resize', this.resize); cancelAnimationFrame(this.mr); window.cancelIdleCallback?.(this.idle)
+    this.layout?.destroy(); removeEventListener('resize', this.resize); cancelAnimationFrame(this.mr); window.cancelIdleCallback?.(this.idle)
     this.cache.clear(); this.el.innerHTML = ''; this.el.classList.remove('stage-static'); delete this.el.dataset.ch
   }
 }

@@ -59,6 +59,8 @@ const fsz = (w, m, k = 1) => Math.max(12, w * (m ? 0.03 : 0.011) * k)
 export const posterMap = {
   home: (ctx, w, h, m) => {
     bg(ctx, w, h)
+    // Compact titles are real HTML, in the same flow as the chapter content.
+    if (m) return
     const r = block(ctx, w, h, m ? { x: 0.06, y: 0.17, w: 0.88, h: 0.36 } : sq(w, h, m, { x: 0.04, y: 0.15, w: 0.92, h: 0.52 }),
       [{ text: 'ДЕЛАЮ', style: 'fill' }, { text: 'ЖИВОЕ', style: 'iri' }], { gap: 0.085 })
     const fs = fsz(w, m)
@@ -66,6 +68,8 @@ export const posterMap = {
   },
   services: (ctx, w, h, m) => {
     bg(ctx, w, h)
+    // Compact titles are real HTML, in the same flow as the chapter content.
+    if (m) return
     const r = block(ctx, w, h, m ? { x: 0.06, y: 0.11, w: 0.88, h: 0.2 } : { x: 0.04, y: 0.14, w: 0.52, h: 0.72 },
       [{ text: 'САЙТЫ', style: 'fill' }, { text: 'БОТЫ', style: 'outline' }, { text: 'АВТОМАТИЗАЦИИ', style: 'fill' }], { gap: 0.025 })
     if (m) return
@@ -74,6 +78,8 @@ export const posterMap = {
   },
   works: (ctx, w, h, m) => {
     bg(ctx, w, h)
+    // Compact titles are real HTML, in the same flow as the chapter content.
+    if (m) return
     const r = block(ctx, w, h, m ? { x: 0.06, y: 0.11, w: 0.88, h: 0.17 } : { x: 0.04, y: 0.1, w: 0.92, h: 0.33 },
       [{ text: 'РАБОТЫ', style: 'outline' }])
     const fs = fsz(w, m)
@@ -81,6 +87,8 @@ export const posterMap = {
   },
   process: (ctx, w, h, m) => {
     bg(ctx, w, h)
+    // Compact titles are real HTML, in the same flow as the chapter content.
+    if (m) return
     const r = block(ctx, w, h, m ? { x: 0.06, y: 0.12, w: 0.88, h: 0.2 } : sq(w, h, m, { x: 0.04, y: 0.11, w: 0.56, h: 0.32 }),
       [{ text: 'КАК Я', style: 'outline' }, { text: 'РАБОТАЮ', style: 'iri' }], { gap: 0.04 })
     const fs = fsz(w, m)
@@ -88,6 +96,8 @@ export const posterMap = {
   },
   reviews: (ctx, w, h, m) => {
     bg(ctx, w, h)
+    // Compact titles are real HTML, in the same flow as the chapter content.
+    if (m) return
     const r = block(ctx, w, h, m ? { x: 0.06, y: 0.12, w: 0.88, h: 0.22 } : sq(w, h, m, { x: 0.04, y: 0.12, w: 0.58, h: 0.4 }),
       [{ text: 'ГОВОРЯТ', style: 'fill' }, { text: 'КЛИЕНТЫ', style: 'outline' }], { gap: 0.04 })
     const fs = fsz(w, m)
@@ -95,6 +105,8 @@ export const posterMap = {
   },
   about: (ctx, w, h, m) => {
     bg(ctx, w, h)
+    // Compact titles are real HTML, in the same flow as the chapter content.
+    if (m) return
     const r = block(ctx, w, h, m ? { x: 0.06, y: 0.13, w: 0.88, h: 0.28 } : sq(w, h, m, { x: 0.04, y: 0.12, w: 0.62, h: 0.52 }),
       [{ text: 'ЭТО', style: 'outline' }, { text: profile.name.toUpperCase(), style: 'iri' }], { gap: 0.03 })
     const fs = fsz(w, m)
@@ -102,6 +114,8 @@ export const posterMap = {
   },
   contact: (ctx, w, h, m) => {
     bg(ctx, w, h)
+    // Compact titles are real HTML, in the same flow as the chapter content.
+    if (m) return
     block(ctx, w, h, m ? { x: 0.06, y: 0.13, w: 0.88, h: 0.32 } : { x: 0.04, y: 0.11, w: 0.6, h: 0.46 },
       [{ text: 'НАПИШИ', style: 'fill' }, { text: 'МНЕ', style: 'iri' }], { gap: 0.03, align: 'left' })
   },

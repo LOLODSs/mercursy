@@ -3,6 +3,8 @@
      TELEGRAM_BOT_TOKEN — токен от @BotFather
      TELEGRAM_CHAT_ID   — твой chat id (npm run tg:chat-id) */
 
+import { addLead } from '../server/crm.js'
+
 const hits = new Map() // простой анти-спам: 5 заявок / 10 минут с одного IP
 const esc = (s = '') => String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]))
 const cut = (s, n) => String(s ?? '').trim().slice(0, n)
@@ -11,8 +13,15 @@ const readBody = (req) => new Promise((ok, fail) => {
   let d = ''; req.on('data', (c) => { d += c; if (d.length > 2e4) req.destroy() }); req.on('end', () => ok(d)); req.on('error', fail)
 })
 
-export function formatLead(l) {
-  const tg = /^@[\w\d_]{4,}$/.test(l.contact) ? l.contact.slice(1) : null
+export function formatLead(l, id = null) {
+  let tg = null
+  const c = String(l.contact || '').trim()
+  if (/^@[\w\d_]{4,}$/.test(c)) tg = c.slice(1)
+  else if (/^[\w\d_]{4,}$/.test(c) && !/^\d+$/.test(c)) tg = c
+  else {
+    const m = c.match(/(?:t\.me|telegram\.me)\/([\w\d_]{4,})/i)
+    if (m) tg = m[1]
+  }
   const text = [
     '🔥 <b>Новая заявка с сайта</b>', '',
     `👤 <b>${esc(l.name)}</b>`,
@@ -23,7 +32,19 @@ export function formatLead(l) {
     `⏰ ${esc(l.deadline)}`,
     '', `<i>${esc(l.page)}</i>`,
   ].join('\n')
-  const reply_markup = tg ? { inline_keyboard: [[{ text: '✍️ Ответить', url: `https://t.me/${tg}` }]] } : undefined
+  const leadKey = id || 'lead'
+  const buttons = []
+  if (tg) buttons.push([{ text: '✍️ Ответить клиенту', url: `https://t.me/${tg}` }])
+  buttons.push([
+    { text: '🟡 В работу', callback_data: `crm:work:${leadKey}` },
+    { text: '🟢 Сдан', callback_data: `crm:done:${leadKey}` },
+    { text: '⚪ В архив', callback_data: `crm:archive:${leadKey}` },
+  ])
+  buttons.push([
+    { text: '📂 Карточка в CRM', callback_data: `crm:view:${leadKey}` },
+    { text: '📋 Копировать бриф', callback_data: `crm:copy:${leadKey}` },
+  ])
+  const reply_markup = { inline_keyboard: buttons }
   return { text, reply_markup }
 }
 
@@ -38,9 +59,11 @@ export async function sendLead(raw, env, ip = 'x') {
   }
   if (!l.contact || !l.task) return [400, { error: 'missing_fields' }]
   if (!env.TELEGRAM_BOT_TOKEN || !env.TELEGRAM_CHAT_ID) return [503, { error: 'not_configured' }]
+  let saved = null
+  try { saved = addLead(l) } catch (e) { console.warn('CRM save error', e.message) }
   const r = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chat_id: env.TELEGRAM_CHAT_ID, parse_mode: 'HTML', disable_web_page_preview: true, ...formatLead(l) }),
+    body: JSON.stringify({ chat_id: env.TELEGRAM_CHAT_ID, parse_mode: 'HTML', disable_web_page_preview: true, ...formatLead(l, saved?.id) }),
   })
   if (!r.ok) { console.error('telegram error', r.status, await r.text()); return [502, { error: 'telegram' }] }
   return [200, { ok: true }]

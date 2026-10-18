@@ -44,10 +44,18 @@ export function Drop({ mood = 'idle', className = '' }) {
 const TYPES = ['Хочу сайт', 'Хочу бота', 'Хочу автоматизацию', 'Другое']
 const TYPE_NAME = { 'Хочу сайт': 'Сайт', 'Хочу бота': 'Бот', 'Хочу автоматизацию': 'Автоматизация', 'Другое': 'Другое' }
 const BUDGETS = ['до 30 000 ₽', '30–80 000 ₽', '80–150 000 ₽', '150 000 ₽+', 'Пока не знаю']
-const DEADLINES = ['Вчера 🔥', 'В течение месяца', '1–3 месяца', 'Не горит']
+const DEADLINES = ['Срочно (1–3 дня) 🔥', 'До 7 дней', '1–2 недели', 'Не горит']
 const FAQ_Q = M.faq.map((f) => f.q)
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
-const validContact = (v) => /^@[\w\d_]{4,}$/.test(v.trim()) || v.replace(/\D/g, '').length >= 10 || /^\S+@\S+\.\S+$/.test(v.trim())
+const validContact = (v) => {
+  const s = v.trim()
+  return (
+    /^@?[\w\d_]{4,}$/.test(s) ||
+    /^(https?:\/\/)?(t\.me|telegram\.me)\/[\w\d_]{4,}$/i.test(s) ||
+    s.replace(/\D/g, '').length >= 10 ||
+    /^\S+@\S+\.\S+$/.test(s)
+  )
+}
 
 /* шаги брифа: field — куда пишем ответ, chips — быстрые ответы, input — ждём текст */
 const STEPS = {
@@ -111,10 +119,11 @@ export default function Mascot({ open, setOpen, prefill, chapterId, onGoWorks })
 
   // подсказки по разделам
   useEffect(() => {
+    setHint(null)
     if (open || !M.hints[chapterId] || seen.current.has(chapterId)) return
     const t1 = setTimeout(() => { seen.current.add(chapterId); setHint(M.hints[chapterId]); setUnread(true) }, chapterId === 'home' ? 2600 : 1100)
     const t2 = setTimeout(() => setHint(null), (chapterId === 'home' ? 2600 : 1100) + 5200)
-    return () => { clearTimeout(t1); clearTimeout(t2) }
+    return () => { clearTimeout(t1); clearTimeout(t2); setHint(null) }
   }, [chapterId, open])
 
   useEffect(() => { body.current?.scrollTo({ top: 1e6, behavior: 'smooth' }) }, [msgs, typing, step])
@@ -167,7 +176,7 @@ export default function Mascot({ open, setOpen, prefill, chapterId, onGoWorks })
       clearTimeout(to)
       const j = await r.json().catch(() => ({}))
       // демо-режим: бэкенд ещё не подключён и сайт в режиме превью (site.showDemoBadges)
-      res = r.ok && j.ok ? 'ok' : (site.showDemoBadges && ([404, 405, 501].includes(r.status) || j.error === 'not_configured')) ? 'demo' : 'error'
+      res = r.ok && j.ok ? 'ok' : (site.showDemoBadges && ([404, 405, 501, 502, 503].includes(r.status) || j.error === 'not_configured')) ? 'demo' : 'error'
     } catch { res = 'error' }
     await sleep(600); setTyping(false)
     setSent(res)
@@ -189,7 +198,14 @@ export default function Mascot({ open, setOpen, prefill, chapterId, onGoWorks })
         <Drop mood={open ? 'happy' : mood} />
         {unread && !open && <span className="mascot-dot" />}
       </button>
-      {hint && !open && <button className="mascot-hint" onClick={() => setOpen(true)}>{hint}<i>Ответить →</i></button>}
+      {hint && !open && (
+        <div className="mascot-hint" onClick={() => setOpen(true)} role="status" tabIndex={0} data-cursor="бриф"
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(true) } }}>
+          <span>{hint}</span>
+          <i>Ответить →</i>
+          <button className="mascot-hint-x" onClick={(e) => { e.stopPropagation(); setHint(null) }} aria-label="Закрыть подсказку" data-cursor="закрыть">×</button>
+        </div>
+      )}
 
       <div ref={panel} className={`chat ${open ? 'open' : ''}`} role="dialog" aria-modal="false" aria-label="Бриф с Каплей" aria-hidden={!open} inert={!open}>
         <header className="chat-head">

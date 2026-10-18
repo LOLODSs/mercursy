@@ -196,7 +196,19 @@
   .bd-push{left:12px;right:12px;max-width:none}
 }
 @container bd (max-width:380px){ .bd-trust{grid-template-columns:1fr} }
-@media (max-width:760px){
+@media (max-width:1280px), (max-height:800px){
   .bd:not(.mini){height:auto;min-height:100%}
   .bd-tg{height:62vh}
+}
+
+@media (max-width:1280px), (max-height:800px){
+  .bd-form input{font-size:16px;min-height:44px}
+  .bd-tabs button,.bd-seg button{min-height:44px}
+  .bd-tg{height:560px;max-height:80svh;min-height:320px}
+}
+
+@media (max-width:1280px), (max-height:800px){
+  .bd:not(.mini) .bd-range input{height:44px;background-size:100% 6px;background-repeat:no-repeat;background-position:center}
+  .bd:not(.mini) .bd-checks label{min-height:44px}
+  .bd:not(.mini) .bd-alert button,.bd:not(.mini) .bd-lead button{min-height:44px;min-width:44px}
 }

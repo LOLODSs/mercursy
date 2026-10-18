@@ -1,14 +1,17 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 const SEL = 'a[href],button:not([disabled]),input:not([disabled]):not([tabindex="-1"]),textarea,[tabindex]:not([tabindex="-1"])'
 /* Держит фокус внутри открытого окна, Esc закрывает, после закрытия возвращает фокус */
 export function useFocusTrap(ref, active, onClose, { trap = true } = {}) {
+  const closeRef = useRef(onClose)
+  closeRef.current = onClose
+
   useEffect(() => {
     if (!active || !ref.current) return
     const prev = document.activeElement
     const el = ref.current
     const t = setTimeout(() => { if (!el.contains(document.activeElement)) el.querySelector(SEL)?.focus({ preventScroll: true }) }, 60)
     const onKey = (e) => {
-      if (e.key === 'Escape') { e.stopPropagation(); onClose(); return }
+      if (e.key === 'Escape') { e.stopPropagation(); closeRef.current?.(); return }
       if (e.key !== 'Tab' || !trap) return
       const f = [...el.querySelectorAll(SEL)].filter((n) => n.offsetParent !== null)
       if (!f.length) return

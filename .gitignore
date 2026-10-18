@@ -1,2 +1,25 @@
 node_modules
 .env
+.env.local
+data/
+
+dist/
+*.log
+dev-crash.log
+
+# Temporary QA & scratch assets
+.zwork/
+scratch/
+qa/
+qa-responsive/
+qa-layout/
+qa-states/
+qa-webgl/
+qa-navigation/
+qa-scenes/
+scripts/*.png
+
+# OS / Editor artifacts
+.DS_Store
+Thumbs.db
+.vscode/
