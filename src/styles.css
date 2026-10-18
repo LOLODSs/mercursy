@@ -71,7 +71,12 @@ a{color:inherit}
 .chapter>*{pointer-events:auto}
 .chapter.wait{visibility:hidden}
 .chapter.leaving>*{animation:melt .6s cubic-bezier(.6,0,.9,.4) forwards}
+.chapter:not(.leaving)>*{animation:chapterEnter .55s cubic-bezier(.16,1,.3,1) both}
+.compact-heading{animation:headingEnter .5s cubic-bezier(.16,1,.3,1) both}
+
 @keyframes melt{to{transform:translateY(60px) scaleY(1.25);filter:blur(10px);opacity:0}}
+@keyframes chapterEnter{from{opacity:0;transform:translateY(24px);filter:blur(4px)}to{opacity:1;transform:none;filter:none}}
+@keyframes headingEnter{from{opacity:0;transform:translateY(-16px);filter:blur(6px)}to{opacity:1;transform:none;filter:none}}
 
 .drip{display:inline}
 .drip-w{display:inline-block;white-space:pre}
@@ -556,9 +561,14 @@ a{color:inherit}
   .svc-item p{font-size:14px;line-height:1.5;max-width:640px}
   .svc-foot{gap:12px;flex-wrap:wrap;margin-top:10px;font-size:14px}
   .svc-foot button{min-height:44px;font-size:14px}
-  .reel{display:flex;gap:16px;padding:0 0 12px;scroll-padding:0;overflow-x:auto;overflow-y:hidden;touch-action:auto;min-height:0}
-  .card{width:min(340px,82vw);height:460px;min-width:0}
+  .reel{display:flex;gap:16px;padding:0 0 12px;scroll-padding:0;overflow-x:auto;overflow-y:hidden;touch-action:pan-x;min-height:0;perspective:none!important}
+  .card{width:min(340px,82vw);height:460px;min-width:0;transform:none!important;transform-style:flat!important;will-change:auto!important}
+  .card:hover,.card:active{transform:none!important}
   .card-media{flex:1;min-height:0}
+  .case-iframe-preview{position:relative;width:100%;height:100%;min-height:280px;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;border-radius:18px;background:#111}
+  .case-iframe-preview img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.65;filter:brightness(.85)}
+  .case-launch-btn{position:relative;z-index:3;min-height:54px;padding:0 24px;font-size:15px;box-shadow:0 12px 32px rgba(0,0,0,.7)}
+  .case-iframe-preview .case-try{position:relative;z-index:3;margin-top:14px;background:rgba(0,0,0,.7);border:1px solid var(--line);border-radius:10px;padding:6px 12px;font-size:12px;color:var(--ink)}
   .card-meta{font-size:11px;letter-spacing:.06em;gap:8px}
   .card h3{font-size:23px;overflow-wrap:anywhere}
   .card p{font-size:14px;line-height:1.5}

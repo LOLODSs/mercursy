@@ -197,9 +197,15 @@ export default function App() {
       if (Math.abs(acc) > 60) { go(chRef.current + Math.sign(acc)); acc = 0 }
     }
     let ty = null, tx = null
-    const onTouchStart = (e) => { ty = e.touches[0].clientY; tx = e.touches[0].clientX }
-    const onTouchMove = (e) => { liquid.current?.setMouse(e.touches[0].clientX, e.touches[0].clientY) }
+    const onTouchStart = (e) => {
+      ty = e.touches[0].clientY; tx = e.touches[0].clientX
+      liquid.current?.setMouse(tx, ty)
+    }
+    const onTouchMove = (e) => {
+      if (e.touches?.[0]) liquid.current?.setMouse(e.touches[0].clientX, e.touches[0].clientY)
+    }
     const onTouchEnd = (e) => {
+      liquid.current?.setMouseActive?.(false)
       if (ty == null || busy(e) || isMobile()) { ty = null; return }
       const dy = ty - e.changedTouches[0].clientY, dx = tx - e.changedTouches[0].clientX
       if (Math.abs(dy) > 55 && Math.abs(dy) > Math.abs(dx) * 1.3) go(chRef.current + Math.sign(dy))
@@ -508,6 +514,7 @@ function Works({ onOpen, covered }) {
 
     let nativeLast = el.scrollLeft
     const onScroll = () => {
+      if (isMobile()) return
       if (!smoothRaf && !down) {
         const d = el.scrollLeft - nativeLast
         nativeLast = el.scrollLeft
@@ -548,9 +555,19 @@ function Works({ onOpen, covered }) {
               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); onOpen({ ...p, idx: i, ox: innerWidth / 2, oy: innerHeight / 2 }) } }}
               onClick={(e) => { if (reel.current.dataset.dragged) return; onOpen({ ...p, idx: i, ox: e.clientX, oy: e.clientY }) }}
               data-cursor={empty ? 'слот' : (p.demo || p.iframe) ? 'потыкать' : 'открыть'}>
-              <div className={`card-media ${(p.demo || p.iframe) ? 'is-demo' : ''} ${p.demo && (covered || !vis.has(i)) ? 'paused' : ''}`}>
-                {p.demo ? <Demo kind={p.demo} mini paused={covered || !vis.has(i)} /> : p.video ? <video src={p.video} poster={p.image || p.cover} autoPlay muted loop playsInline /> : <img src={p.image || p.cover} alt="" draggable="false" loading="lazy" />}
-                {(p.demo || p.iframe) && <span className="live-chip"><i />{p.chipLabel || (p.type === '3D-сайт' ? '3D проект' : p.iframe ? 'живой сайт' : 'интерактив')}</span>}
+              <div className={`card-media ${(p.demo || p.iframe || p.video) ? 'is-demo' : ''} ${p.demo && (covered || !vis.has(i)) ? 'paused' : ''}`}>
+                {isMobile() ? (
+                  <img src={p.image || p.cover} alt={p.title || ''} draggable="false" loading="lazy" />
+                ) : p.demo ? (
+                  <Demo kind={p.demo} mini paused={covered || !vis.has(i)} />
+                ) : p.video ? (
+                  <video src={p.video} poster={p.image || p.cover} autoPlay muted loop playsInline />
+                ) : (
+                  <img src={p.image || p.cover} alt={p.title || ''} draggable="false" loading="lazy" />
+                )}
+                {(p.demo || p.iframe || p.video) && (
+                  <span className="live-chip"><i />{p.chipLabel || (p.type === '3D-сайт' ? '3D проект' : p.iframe ? 'живой сайт' : p.video ? 'видео' : 'интерактив')}</span>
+                )}
               </div>
               <div className="card-meta">
                 <span>{String(i + 1).padStart(2, '0')} <Badge on={p.isDemo} /></span>
@@ -570,11 +587,13 @@ function Works({ onOpen, covered }) {
 function Case({ data, onClose, onContact, onNext }) {
   const ref = useRef(null)
   useFocusTrap(ref, true, onClose)
+  const [loadInteractive, setLoadInteractive] = useState(!isMobile())
 
   useEffect(() => {
     ref.current?.scrollTo({ top: 0, behavior: 'instant' })
     const info = ref.current?.querySelector('.case-info')
     info?.scrollTo({ top: 0, behavior: 'instant' })
+    setLoadInteractive(!isMobile())
   }, [data.idx])
 
   const empty = !data.title
@@ -583,10 +602,20 @@ function Case({ data, onClose, onContact, onNext }) {
       <button className="case-close" onClick={onClose} aria-label="Закрыть"><svg width="18" height="18" viewBox="0 0 18 18"><path d="M3 3l12 12M15 3L3 15" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" /></svg></button>
       <div className={`case-media ${data.demo ? `demo-${data.demo}` : ''} ${data.iframe ? 'is-iframe' : ''}`}>
         {data.iframe ? (
-          <>
-            <iframe src={data.iframe} title={data.title} className="case-iframe" />
-            <span className="case-try">{data.tryLabel || 'Интерактивный проект — покрути и потыкай ↓'}</span>
-          </>
+          loadInteractive ? (
+            <>
+              <iframe src={data.iframe} title={data.title} className="case-iframe" />
+              <span className="case-try">{data.tryLabel || 'Интерактивный проект — покрути и потыкай ↓'}</span>
+            </>
+          ) : (
+            <div className="case-iframe-preview">
+              <img src={data.image || data.cover} alt={data.title} />
+              <button className="btn chrome case-launch-btn" onClick={() => setLoadInteractive(true)}>
+                <span>▶ Запустить интерактив / 3D</span>
+              </button>
+              <span className="case-try">Нажмите для загрузки живой 3D-версии проекта</span>
+            </div>
+          )
         ) : data.demo ? <Demo kind={data.demo} /> : data.video ? <video src={data.video} poster={data.image || data.cover} autoPlay muted loop playsInline controls /> : <img src={data.image || data.cover} alt="" />}
         {data.demo && <span className="case-try">{data.tryLabel || 'Интерактивный проект — потыкай ↓'}</span>}
       </div>

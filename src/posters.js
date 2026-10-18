@@ -56,11 +56,22 @@ export const chapters = [
 const sq = (w, h, m, box) => (!m && w / h > 1.7 ? { ...box, h: box.h * 0.86, y: box.y + 0.025 } : box)
 const fsz = (w, m, k = 1) => Math.max(12, w * (m ? 0.03 : 0.011) * k)
 
+function ambientGlow(ctx, w, h, color1, color2, cx = 0.5, cy = 0.4) {
+  const g = ctx.createRadialGradient(w * cx, h * cy, 0, w * cx, h * cy, Math.max(w, h) * 0.75)
+  g.addColorStop(0, color1)
+  g.addColorStop(0.5, color2)
+  g.addColorStop(1, 'rgba(0,0,0,0)')
+  ctx.fillStyle = g
+  ctx.fillRect(0, 0, w, h)
+}
+
 export const posterMap = {
   home: (ctx, w, h, m) => {
     bg(ctx, w, h)
-    // Compact titles are real HTML, in the same flow as the chapter content.
-    if (m) return
+    if (m) {
+      ambientGlow(ctx, w, h, 'rgba(255, 154, 213, 0.22)', 'rgba(159, 232, 255, 0.08)', 0.7, 0.3)
+      return
+    }
     const r = block(ctx, w, h, m ? { x: 0.06, y: 0.17, w: 0.88, h: 0.36 } : sq(w, h, m, { x: 0.04, y: 0.15, w: 0.92, h: 0.52 }),
       [{ text: 'ДЕЛАЮ', style: 'fill' }, { text: 'ЖИВОЕ', style: 'iri' }], { gap: 0.085 })
     const fs = fsz(w, m)
@@ -68,8 +79,10 @@ export const posterMap = {
   },
   services: (ctx, w, h, m) => {
     bg(ctx, w, h)
-    // Compact titles are real HTML, in the same flow as the chapter content.
-    if (m) return
+    if (m) {
+      ambientGlow(ctx, w, h, 'rgba(159, 232, 255, 0.24)', 'rgba(70, 130, 200, 0.08)', 0.25, 0.75)
+      return
+    }
     const r = block(ctx, w, h, m ? { x: 0.06, y: 0.11, w: 0.88, h: 0.2 } : { x: 0.04, y: 0.14, w: 0.52, h: 0.72 },
       [{ text: 'САЙТЫ', style: 'fill' }, { text: 'БОТЫ', style: 'outline' }, { text: 'АВТОМАТИЗАЦИИ', style: 'fill' }], { gap: 0.025 })
     if (m) return
@@ -78,8 +91,10 @@ export const posterMap = {
   },
   works: (ctx, w, h, m) => {
     bg(ctx, w, h)
-    // Compact titles are real HTML, in the same flow as the chapter content.
-    if (m) return
+    if (m) {
+      ambientGlow(ctx, w, h, 'rgba(180, 130, 255, 0.25)', 'rgba(110, 70, 220, 0.09)', 0.5, 0.45)
+      return
+    }
     const r = block(ctx, w, h, m ? { x: 0.06, y: 0.11, w: 0.88, h: 0.17 } : { x: 0.04, y: 0.1, w: 0.92, h: 0.33 },
       [{ text: 'РАБОТЫ', style: 'outline' }])
     const fs = fsz(w, m)
@@ -87,8 +102,10 @@ export const posterMap = {
   },
   process: (ctx, w, h, m) => {
     bg(ctx, w, h)
-    // Compact titles are real HTML, in the same flow as the chapter content.
-    if (m) return
+    if (m) {
+      ambientGlow(ctx, w, h, 'rgba(217, 255, 138, 0.22)', 'rgba(255, 190, 80, 0.08)', 0.75, 0.35)
+      return
+    }
     const r = block(ctx, w, h, m ? { x: 0.06, y: 0.12, w: 0.88, h: 0.2 } : sq(w, h, m, { x: 0.04, y: 0.11, w: 0.56, h: 0.32 }),
       [{ text: 'КАК Я', style: 'outline' }, { text: 'РАБОТАЮ', style: 'iri' }], { gap: 0.04 })
     const fs = fsz(w, m)
@@ -96,8 +113,10 @@ export const posterMap = {
   },
   reviews: (ctx, w, h, m) => {
     bg(ctx, w, h)
-    // Compact titles are real HTML, in the same flow as the chapter content.
-    if (m) return
+    if (m) {
+      ambientGlow(ctx, w, h, 'rgba(159, 232, 255, 0.20)', 'rgba(217, 255, 138, 0.08)', 0.45, 0.4)
+      return
+    }
     const r = block(ctx, w, h, m ? { x: 0.06, y: 0.12, w: 0.88, h: 0.22 } : sq(w, h, m, { x: 0.04, y: 0.12, w: 0.58, h: 0.4 }),
       [{ text: 'ГОВОРЯТ', style: 'fill' }, { text: 'КЛИЕНТЫ', style: 'outline' }], { gap: 0.04 })
     const fs = fsz(w, m)
@@ -105,8 +124,10 @@ export const posterMap = {
   },
   about: (ctx, w, h, m) => {
     bg(ctx, w, h)
-    // Compact titles are real HTML, in the same flow as the chapter content.
-    if (m) return
+    if (m) {
+      ambientGlow(ctx, w, h, 'rgba(235, 245, 255, 0.20)', 'rgba(160, 180, 210, 0.08)', 0.65, 0.4)
+      return
+    }
     const r = block(ctx, w, h, m ? { x: 0.06, y: 0.13, w: 0.88, h: 0.28 } : sq(w, h, m, { x: 0.04, y: 0.12, w: 0.62, h: 0.52 }),
       [{ text: 'ЭТО', style: 'outline' }, { text: profile.name.toUpperCase(), style: 'iri' }], { gap: 0.03 })
     const fs = fsz(w, m)
@@ -114,8 +135,10 @@ export const posterMap = {
   },
   contact: (ctx, w, h, m) => {
     bg(ctx, w, h)
-    // Compact titles are real HTML, in the same flow as the chapter content.
-    if (m) return
+    if (m) {
+      ambientGlow(ctx, w, h, 'rgba(255, 154, 213, 0.25)', 'rgba(217, 255, 138, 0.10)', 0.5, 0.5)
+      return
+    }
     block(ctx, w, h, m ? { x: 0.06, y: 0.13, w: 0.88, h: 0.32 } : { x: 0.04, y: 0.11, w: 0.6, h: 0.46 },
       [{ text: 'НАПИШИ', style: 'fill' }, { text: 'МНЕ', style: 'iri' }], { gap: 0.03, align: 'left' })
   },

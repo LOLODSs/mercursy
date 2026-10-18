@@ -257,7 +257,7 @@ export class Liquid {
     this.fr.hold = performance.now() + 250
     this.chapter = chapter
     this.layout?.setChapter(this.chapter)
-    this.splash(2.2)
+    this.splash(this.mobile ? 4.5 : 2.5)
   }
   finish() {
     const t = this.trans; if (!t) return
@@ -275,20 +275,23 @@ export class Liquid {
     if (this.want) this.prefetch(this.want)
   }
   setMouse(cx, cy) {
-    if(this.layout?.current?.bounded){this.mouse.active=false;return}
+    if (this.layout?.current?.bounded && !this.mobile) { this.mouse.active = false; return }
     const W = H * innerWidth / innerHeight
     this.mouse.x = (cx / innerWidth * 2 - 1) * W
     this.mouse.y = -(cy / innerHeight * 2 - 1) * H
     this.mouse.active = true
   }
+  setMouseActive(active) {
+    this.mouse.active = !!active
+  }
   splash(power = 5) {
-    if(this.layout?.current?.bounded)return
+    if (this.layout?.current?.bounded && !this.mobile) return
     this.balls.forEach((b, i) => { if (!i) return; const a = Math.random() * 6.283; b.vx += Math.cos(a) * power; b.vy += Math.sin(a) * power; b.vz += (Math.random() - 0.5) * power })
   }
   targets(t) {
-    const layout=this.layout?.current
-    if(layout?.bounded){const geometry=mercuryGeometry(layout.bounds,t,this.chapter);this.shapeScale=geometry.scale;return geometry.targets}
-    this.shapeScale=1
+    const layout = this.layout?.current
+    if (layout?.bounded && !this.mobile) { const geometry = mercuryGeometry(layout.bounds, t, this.chapter); this.shapeScale = geometry.scale; return geometry.targets }
+    this.shapeScale = 1
     const asp = innerWidth / innerHeight, W = H * asp, m = this.mobile
     const s = m ? 0.62 : Math.min(1, Math.max(0.7, asp / 1.6))
     const R = [0.62, 0.44, 0.36, 0.3, 0.26, 0.22, 0.19, 0.16, 0.13].map((r) => r * s)
@@ -383,23 +386,26 @@ export class Liquid {
           tx = this.mobile ? tg[0][0] : tg[0][0] - 0.9; ty = tg[0][1] + oy
         }
         tz = 0.3; tr = (this.chapter === 'contact' ? 0.42 : 0.3) * (this.mobile ? 0.7 : 1)
-      } else [tx, ty, tz, tr] = tg[i - 1]
-      if(this.layout?.current?.bounded && i===0){[tx,ty,tz,tr]=tg[0];tr*=.45}
-      if(this.snapScene){b.x=tx;b.y=ty;b.z=tz;b.r=tr;b.vx=b.vy=b.vz=0}
+      } else {
+        [tx, ty, tz, tr] = tg[i - 1]
+      }
+      if (this.layout?.current?.bounded && !this.mobile && i === 0) { [tx, ty, tz, tr] = tg[0]; tr *= 0.45 }
+      if (this.snapScene) { b.x = tx; b.y = ty; b.z = tz; b.r = tr; b.vx = b.vy = b.vz = 0 }
       const k = i === 0 ? 14 : b.k
       b.vx += (tx - b.x) * k * dt; b.vy += (ty - b.y) * k * dt; b.vz += (tz - b.z) * k * dt
       const damp = Math.pow(i === 0 ? 0.02 : 0.12, dt)
       b.vx *= damp; b.vy *= damp; b.vz *= damp
       b.x += b.vx * dt; b.y += b.vy * dt; b.z += b.vz * dt
       b.r += (tr - b.r) * Math.min(1, dt * 3)
-      if(this.layout?.current?.bounded)constrainBall(b,this.layout.current.bounds,this.shapeScale)
+      if (this.layout?.current?.bounded && !this.mobile) constrainBall(b, this.layout.current.bounds, this.shapeScale)
       U[i * 4] = b.x; U[i * 4 + 1] = b.y; U[i * 4 + 2] = b.z; U[i * 4 + 3] = Math.max(0.01, b.r)
     })
-    this.snapScene=false
-    const layout=this.layout?.current
-    gl.uniform1f(this.L.bounded,layout?.bounded?1:0);gl.uniform1f(this.L.shape,this.shapeScale||1)
-    if(layout?.bounded){const c=layout.clip;gl.uniform4f(this.L.safe,c.x/innerWidth,1-(c.y+c.height)/innerHeight,(c.x+c.width)/innerWidth,1-c.y/innerHeight)}
-    else gl.uniform4f(this.L.safe,0,0,1,1)
+    this.snapScene = false
+    const layout = this.layout?.current
+    const isBounded = layout?.bounded && !this.mobile
+    gl.uniform1f(this.L.bounded, isBounded ? 1 : 0); gl.uniform1f(this.L.shape, this.shapeScale || 1)
+    if (isBounded) { const c = layout.clip; gl.uniform4f(this.L.safe, c.x / innerWidth, 1 - (c.y + c.height) / innerHeight, (c.x + c.width) / innerWidth, 1 - c.y / innerHeight) }
+    else gl.uniform4f(this.L.safe, 0, 0, 1, 1)
     gl.uniform1f(this.L.time, t); gl.uniform1f(this.L.mix, this.mix); gl.uniform4fv(this.L.b, U)
     gl.drawArrays(gl.TRIANGLES, 0, 3)
   }
