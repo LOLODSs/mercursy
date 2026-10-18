@@ -11,7 +11,10 @@ const H = 2.4 // half visible height at z=0  (camera z=6, tan = .4)
 const PAD = 0.75 // запас: smin(k=.62) раздувает поле максимум на k/4, плюс рябь .022 и ореол тени md<.4
 
 const vert = `attribute vec2 aP; varying vec2 vUv; void main(){ vUv=aP*.5+.5; gl_Position=vec4(aP,0.,1.); }`
-const frag = `
+function getFrag(mobile) {
+  const steps = mobile ? 32 : 44
+  const hitEps = mobile ? '0.0016' : '0.0014'
+  return `
 precision highp float;
 varying vec2 vUv;
 uniform vec2 uRes; uniform float uTime; uniform vec4 uB[${N}];
@@ -41,8 +44,7 @@ vec3 poster(vec2 uv){
   vec3 b=texture2D(uBt,uv-vec2(0.,drip*.6)).rgb;
   return mix(a,b,tmask(uv));
 }
-// преломление с хроматикой: три канала со сдвигом r, 1.05r, 1.1r. Маска перехода и подтёк
-// считаются один раз на средней точке (раньше — трижды): во время перехода это главная экономия
+// преломление с хроматикой: три канала со сдвигом r, 1.05r, 1.1r
 vec3 poster3(vec2 uv,vec2 r){
   vec2 u0=uv-r, u1=uv-r*1.05, u2=uv-r*1.1;
   if(uMix<=0.) return vec3(texture2D(uA,u0).r,texture2D(uA,u1).g,texture2D(uA,u2).b);
@@ -82,7 +84,7 @@ void main(){
     if(h>0.){ h=sqrt(h); t0=min(t0,-bb-h); t1=max(t1,-bb+h); } }
   if(t1>0. && safe>0.){
     float t=max(t0,0.), md=1e3; bool hit=false; t1=min(t1,9.);
-    for(int i=0;i<48;i++){ vec3 q=ro+rd*t; float d=map(q); md=min(md,d); if(d<.0012){hit=true;break;} t+=d*.95; if(t>t1)break; }
+    for(int i=0;i<${steps};i++){ vec3 q=ro+rd*t; float d=map(q); md=min(md,d); if(d<${hitEps}){hit=true;break;} t+=d*.95; if(t>t1)break; }
     vec3 bgCol=col*(.5+.5*smoothstep(0.,.4*uShapeScale,md));
     if(hit){
       vec3 q=ro+rd*t; vec3 n=nrm(q);
@@ -106,6 +108,7 @@ void main(){
   col+=(hash(fc+fract(uTime))-.5)*mix(.006,0.,smoothstep(.15,.5,lum));
   gl_FragColor=vec4(col,1.);
 }`
+}
 
 export class Liquid {
   constructor(el) {
@@ -126,9 +129,9 @@ export class Liquid {
     this.reduce = matchMedia('(prefers-reduced-motion: reduce)').matches
     this.initGL()
     cv.addEventListener('webglcontextlost', this.onLost = (e) => { e.preventDefault(); this.gl = null; this.stop() })
-    cv.addEventListener('webglcontextrestored', this.onRestored = () => { this.initGL(); this.size(); this.cA && this.upload(0, this.cA); this.cB && this.upload(1, this.cB); this.start() })
-    this.size()
-    let rt; this.onResize = () => { this.size(); clearTimeout(rt); rt = setTimeout(() => { this.size(); this.repaint() }, 120) }
+    cv.addEventListener('webglcontextrestored', this.onRestored = () => { this.initGL(); this.size(true); this.cA && this.upload(0, this.cA); this.cB && this.upload(1, this.cB); this.start() })
+    this.size(true)
+    let rt; this.onResize = () => { this.size(true); clearTimeout(rt); rt = setTimeout(() => { this.size(true); this.repaint() }, 120) }
     addEventListener('resize', this.onResize)
     this.t0 = performance.now(); this.last = this.t0
     this.loop = (now) => { this.raf = requestAnimationFrame(this.loop); this.tick(now) }
@@ -143,18 +146,10 @@ export class Liquid {
     const o = { antialias: false, alpha: false, depth: false, stencil: false, powerPreference: 'high-performance', preserveDrawingBuffer: false }
     const gl = this.gl = this.canvas.getContext('webgl', o) || this.canvas.getContext('experimental-webgl', o)
     if (!gl) throw new Error('no webgl')
-    const sh = (type, s) => { const x = gl.createShader(type); gl.shaderSource(x, s); gl.compileShader(x); if (!gl.getShaderParameter(x, gl.COMPILE_STATUS) && !gl.isContextLost()) throw new Error(gl.getShaderInfoLog(x)); return x }
-    const pr = gl.createProgram()
-    gl.attachShader(pr, sh(gl.VERTEX_SHADER, vert)); gl.attachShader(pr, sh(gl.FRAGMENT_SHADER, frag))
-    gl.bindAttribLocation(pr, 0, 'aP'); gl.linkProgram(pr)
-    if (!gl.getProgramParameter(pr, gl.LINK_STATUS) && !gl.isContextLost()) throw new Error(gl.getProgramInfoLog(pr))
-    gl.useProgram(pr)
+    this.initProgram()
     gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer())
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW)
     gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0)
-    const L = (n) => gl.getUniformLocation(pr, n)
-    this.L = { res: L('uRes'), time: L('uTime'), mix: L('uMix'), b: L('uB'), a: L('uA'), bt: L('uBt'), safe: L('uSafe'), bounded: L('uBounded'), shape: L('uShapeScale') }
-    gl.uniform1i(this.L.a, 0); gl.uniform1i(this.L.bt, 1)
     this.tex = [0, 1].map((u) => {
       const t = gl.createTexture(); gl.activeTexture(gl.TEXTURE0 + u); gl.bindTexture(gl.TEXTURE_2D, t)
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
@@ -165,6 +160,19 @@ export class Liquid {
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true)
     this.texSize = []
     gl.disable(gl.DEPTH_TEST); gl.disable(gl.BLEND)
+  }
+  initProgram() {
+    const gl = this.gl
+    if (this.pr) gl.deleteProgram(this.pr)
+    const sh = (type, s) => { const x = gl.createShader(type); gl.shaderSource(x, s); gl.compileShader(x); if (!gl.getShaderParameter(x, gl.COMPILE_STATUS) && !gl.isContextLost()) throw new Error(gl.getShaderInfoLog(x)); return x }
+    const pr = this.pr = gl.createProgram()
+    gl.attachShader(pr, sh(gl.VERTEX_SHADER, vert)); gl.attachShader(pr, sh(gl.FRAGMENT_SHADER, getFrag(this.mobile)))
+    gl.bindAttribLocation(pr, 0, 'aP'); gl.linkProgram(pr)
+    if (!gl.getProgramParameter(pr, gl.LINK_STATUS) && !gl.isContextLost()) throw new Error(gl.getProgramInfoLog(pr))
+    gl.useProgram(pr)
+    const L = (n) => gl.getUniformLocation(pr, n)
+    this.L = { res: L('uRes'), time: L('uTime'), mix: L('uMix'), b: L('uB'), a: L('uA'), bt: L('uBt'), safe: L('uSafe'), bounded: L('uBounded'), shape: L('uShapeScale') }
+    gl.uniform1i(this.L.a, 0); gl.uniform1i(this.L.bt, 1)
   }
   // текстурный юнит 0 — текущий постер (uA), 1 — следующий (uBt)
   upload(unit, c) {
@@ -182,22 +190,33 @@ export class Liquid {
   resume() { this.paused = 0; this.start() }
   dpr() {
     const raw = devicePixelRatio || 1
-    const d = Math.min(Math.max(raw, this.mobile ? 1.4 : 1), this.mobile ? 1.6 : 2)
+    if (this.mobile) {
+      const d = Math.min(raw, 1.15)
+      const maxDim = Math.max(innerWidth, innerHeight) * d
+      return maxDim > 1280 ? Math.max(0.85, 1280 / Math.max(innerWidth, innerHeight)) : d
+    }
+    const d = Math.min(Math.max(raw, 1), 1.5)
     const maxDim = Math.max(innerWidth, innerHeight) * d
-    return maxDim > 2560 ? Math.max(1, 2560 / Math.max(innerWidth, innerHeight)) : d
+    return maxDim > 1920 ? Math.max(1, 1920 / Math.max(innerWidth, innerHeight)) : d
   }
   // размер буфера рендера: меняется и от ресайза, и от губернатора качества
-  size() {
+  size(force = false) {
     const w = innerWidth, h = innerHeight
     const d = this.dpr()
     const cw = Math.max(1, Math.round(w * d * this.quality)), ch = Math.max(1, Math.round(h * d * this.quality))
-    if (this.canvas.width !== cw || this.canvas.height !== ch) { this.canvas.width = cw; this.canvas.height = ch }
-    this.res = [cw, ch]
-    if (this.gl) { this.gl.viewport(0, 0, cw, ch); this.gl.uniform2f(this.L.res, cw, ch) }
+    if (force || Math.abs(this.canvas.width - cw) >= 16 || Math.abs(this.canvas.height - ch) >= 16) {
+      this.canvas.width = cw; this.canvas.height = ch
+    }
+    const actualW = this.canvas.width, actualH = this.canvas.height
+    this.res = [actualW, actualH]
+    if (this.gl) { this.gl.viewport(0, 0, actualW, actualH); this.gl.uniform2f(this.L.res, actualW, actualH) }
   }
   /* Постеры: на десктопе точно соответствуют DPR экрана (1:1 пиксель-в-пиксель,
      без билинейного размытия и алиасинга шрифтов). */
-  posterScale() { return this.dpr() }
+  posterScale() {
+    const raw = devicePixelRatio || 1
+    return Math.min(raw, this.mobile ? 1.25 : 1.5)
+  }
   canvasFor() {
     const c = this.pool.pop() || document.createElement('canvas')
     const ts = this.posterScale(), w = Math.round(innerWidth * ts), h = Math.round(innerHeight * ts)
@@ -230,14 +249,18 @@ export class Liquid {
   }
   repaint() {
     const was = this.mobile; this.mobile = isMobile()
-    if (was !== this.mobile) { this.maxQ = this.mobile ? 0.85 : 1.0; this.quality = Math.min(this.quality, this.maxQ); this.ceil = this.maxQ; this.size() }
+    if (was !== this.mobile) {
+      this.maxQ = this.mobile ? 0.85 : 1.0; this.quality = Math.min(this.quality, this.maxQ); this.ceil = this.maxQ
+      if (this.gl) { try { this.initProgram() } catch (e) {} }
+      this.size(true)
+    }
     for (const c of this.cache.values()) this.release(c)
     this.cache.clear()
     if (this.draw) { this.cA = this.canvasFor(); this.paint(this.cA, this.draw); this.upload(0, this.cA) }
     if (this.trans) { this.cB = this.canvasFor(); this.paint(this.cB, this.trans.draw); this.upload(1, this.cB) }
     this.schedule()
   }
-  resize() { this.size(); this.repaint() }
+  resize() { this.size(true); this.repaint() }
   paint(c, fn) {
     const ctx = c.getContext('2d')
     ctx.setTransform(1, 0, 0, 1, 0, 0)
@@ -369,13 +392,13 @@ export class Liquid {
     if (f.n < 45 && !(f.sum > 1 && f.n >= 8)) return // окно: 45 кадров или ~1 с на медленном устройстве
     const avg = f.sum / f.n; f.n = 0; f.sum = 0
     // качество уже на минимуме, а кадры всё равно > 30 мс несколько окон подряд — устройство не тянет: предложим лёгкий режим
-    if (avg > 0.03 && this.quality <= 0.41) { if (++f.slow >= 3 && !this.slowSent) { this.slowSent = true; this.onSlow?.() } } else if (avg < 0.025) f.slow = 0
+    if (avg > 0.03 && this.quality <= 0.45) { if (++f.slow >= 3 && !this.slowSent) { this.slowSent = true; this.onSlow?.() } } else if (avg < 0.025) f.slow = 0
     if (this.ceil < this.maxQ && now - this.ceilAt > 15000) { this.ceil = Math.min(this.maxQ, this.ceil + 0.04); this.ceilAt = now }
-    if (avg > 0.0205 && this.quality > 0.4) {
-      this.ceil = Math.max(0.4, this.quality - 0.02); this.ceilAt = now
-      this.quality = Math.max(0.4, this.quality - (avg > 0.06 ? 0.2 : avg > 0.03 ? 0.12 : 0.07)); f.good = 0; this.size()
-    } else if (avg < 0.0176 && this.quality < this.ceil) {
-      if (++f.good >= 4) { f.good = 0; this.quality = Math.min(this.ceil, this.quality + 0.04); this.size() }
+    if (avg > 0.021 && this.quality > 0.45) {
+      this.ceil = Math.max(0.45, this.quality - 0.02); this.ceilAt = now
+      this.quality = Math.max(0.45, this.quality - (avg > 0.06 ? 0.15 : avg > 0.03 ? 0.08 : 0.05)); f.good = 0; this.size(false)
+    } else if (avg < 0.0168 && this.quality < this.ceil) {
+      if (++f.good >= 5) { f.good = 0; this.quality = Math.min(this.ceil, this.quality + 0.04); this.size(false) }
     } else f.good = 0
   }
   tick(now) {

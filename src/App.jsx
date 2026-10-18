@@ -200,10 +200,10 @@ export default function App() {
     let ty = null, tx = null
     const onTouchStart = (e) => {
       ty = e.touches[0].clientY; tx = e.touches[0].clientX
-      liquid.current?.setMouse(tx, ty)
+      if (!isMobile()) liquid.current?.setMouse(tx, ty)
     }
     const onTouchMove = (e) => {
-      if (e.touches?.[0]) liquid.current?.setMouse(e.touches[0].clientX, e.touches[0].clientY)
+      if (!isMobile() && e.touches?.[0]) liquid.current?.setMouse(e.touches[0].clientX, e.touches[0].clientY)
     }
     const onTouchEnd = (e) => {
       liquid.current?.setMouseActive?.(false)
@@ -379,12 +379,27 @@ function Services({ openType }) {
   )
 }
 
+function LazyVideo({ src, poster, active }) {
+  const ref = useRef(null)
+  useEffect(() => {
+    const v = ref.current
+    if (!v) return
+    if (active) {
+      v.play().catch(() => {})
+    } else {
+      v.pause()
+    }
+  }, [active])
+  return <video ref={ref} src={src} poster={poster} muted loop playsInline preload="none" />
+}
+
 function Works({ onOpen, covered }) {
   const reel = useRef(null)
   const [activeIdx, setActiveIdx] = useState(0)
   // какие карточки сейчас видны в ленте — живые мини-демо крутятся только у них
   const [vis, setVis] = useState(() => new Set())
   useEffect(() => {
+    if (isMobile()) return // на телефоне карточки статичны — не триггерим лишние ре-рендеры при свайпах
     if (!window.IntersectionObserver) { setVis(new Set(projects.map((_, i) => i))); return }
     const io = new IntersectionObserver((es) => setVis((v) => {
       const n = new Set(v); es.forEach((e) => (e.isIntersecting ? n.add(+e.target.dataset.i) : n.delete(+e.target.dataset.i))); return n
@@ -412,7 +427,7 @@ function Works({ onOpen, covered }) {
             closest = idx
           }
         })
-        setActiveIdx(closest)
+        setActiveIdx((prev) => (prev === closest ? prev : closest))
       })
     }
     el.addEventListener('scroll', onScrollActive, { passive: true })
@@ -432,6 +447,7 @@ function Works({ onOpen, covered }) {
     let lastRotY = 0, lastScale = 1, lastShift = 0
 
     const updateVisuals = (velocity) => {
+      if (isMobile()) return
       const rotY = Math.round(Math.max(-13, Math.min(13, -velocity * 0.35)) * 10) / 10
       const rotZ = Math.round(Math.max(-2, Math.min(2, -velocity * 0.05)) * 10) / 10
       const scale = Math.round(Math.max(0.96, 1 - Math.min(0.04, Math.abs(velocity) * 0.0014)) * 1000) / 1000
@@ -639,7 +655,7 @@ function Works({ onOpen, covered }) {
                 ) : p.demo ? (
                   <Demo kind={p.demo} mini paused={covered || !vis.has(i)} />
                 ) : p.video ? (
-                  <video src={p.video} poster={p.image || p.cover} autoPlay muted loop playsInline />
+                  <LazyVideo src={p.video} poster={p.image || p.cover} active={!covered && vis.has(i)} />
                 ) : (
                   <img src={p.image || p.cover} alt={p.title || ''} draggable="false" loading="lazy" />
                 )}

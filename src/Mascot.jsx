@@ -141,6 +141,7 @@ export default function Mascot({ open, setOpen, prefill, chapterId, onGoWorks })
 
   // глаза следят за курсором
   useEffect(() => {
+    if (isMobile()) return // на мобильных устройствах нет мыши — экономим обработку pointermove
     // не чаще раза за кадр; позицию капли кешируем (сбрасываем на ресайз), чтобы не дёргать layout
     let r = null, rt = 0, raf = 0, px = 0, py = 0
     const upd = () => {
