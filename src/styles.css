@@ -555,6 +555,7 @@ a{color:inherit}
   .lead{font-size:16px;line-height:1.55;max-width:620px}
   .home-foot .row{margin-top:24px}
   .home-foot .btn{flex:1 1 180px;min-height:52px;padding:0 16px;font-size:14px;white-space:normal}
+  .home-foot .btn-discuss{display:none}
   .svc{display:grid;grid-template-columns:1fr;gap:12px;max-width:1040px}
   .svc-item{padding:20px;border-radius:20px;min-width:0}
   .svc-item h3{font-size:26px;margin:6px 0 8px}

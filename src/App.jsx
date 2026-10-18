@@ -352,7 +352,7 @@ function Home({ go, openChat }) {
         <p className="lead"><Drip text={profile.tagline} delay={150} /></p>
         <div className="row">
           <button className="btn chrome" onClick={() => go(IDS.indexOf('works'))}>Смотреть работы</button>
-          <button className="btn line" onClick={() => openChat()}>Обсудить проект</button>
+          <button className="btn line btn-discuss" onClick={() => openChat()}>Обсудить проект</button>
         </div>
       </div>
       <p className="touch-hint">Потрогай ртуть курсором.<br />Кликни — расплескаешь.</p>
