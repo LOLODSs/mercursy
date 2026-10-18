@@ -17,6 +17,10 @@ export const profile = {
   telegram: 'https://t.me/Xitinchik',
   telegramLabel: '@Xitinchik',
   email: 'nindza.lk@gmail.com',
+  vk: 'https://vk.com/blagamix',
+  vkLabel: 'vk.com/blagamix',
+  max: 'https://max.ru/u/f9LHodD0cOKZ9w7lYHTEgutigaXYvJiCkeQi9X9592E6KMgdiPZj0XadWSg',
+  maxLabel: 'max.ru',
   github: null,
   availability: null,
   photo: null,                               // 🟡 ЗАГЛУШКА — 'media/me.webp', круглое фото в «Обо мне» (живой человек = доверие)
