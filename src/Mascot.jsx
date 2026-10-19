@@ -78,6 +78,7 @@ export default function Mascot({ open, setOpen, prefill, chapterId, onGoWorks })
   const [unread, setUnread] = useState(false)
   const [mood, setMood] = useState('idle')
   const [sent, setSent] = useState(null)
+  const [history, setHistory] = useState([])
   const started = useRef(false), seen = useRef(new Set()), body = useRef(null), panel = useRef(null), launcher = useRef(null), hp = useRef(null), inputRef = useRef(null)
   const leadRef = useRef({}); leadRef.current = lead
 
@@ -99,15 +100,32 @@ export default function Mascot({ open, setOpen, prefill, chapterId, onGoWorks })
   }, [say])
 
   const start = useCallback(async (pf) => {
-    setMsgs([]); setSent(null)
+    setMsgs([]); setSent(null); setHistory([])
     const base = pf?.type ? { type: pf.type, ref: pf.ref } : {}
     setLead(base); leadRef.current = base
     if (pf?.type) {
       await say(['Привет! Я Капля 💧 Соберу бриф и сразу передам его в Telegram.'])
       setMsgs((m) => [...m, { from: 'me', text: pf.ref ? `Хочу так же, как ${pf.ref}` : `Нужно: ${pf.type}` }])
+      setHistory([{ step: 'type', lead: {}, msgsLength: 0 }])
       goStep('task', base)
     } else goStep('type', base)
   }, [say, goStep])
+
+  const goBack = useCallback(() => {
+    if (!history.length || typing) return
+    const prev = history[history.length - 1]
+    setHistory((h) => h.slice(0, -1))
+    setLead(prev.lead)
+    leadRef.current = prev.lead
+    if (prev.step === 'type' && prev.msgsLength === 0) {
+      setMsgs([])
+      goStep('type', {})
+      return
+    }
+    setMsgs((m) => m.slice(0, prev.msgsLength))
+    setText('')
+    setStep(prev.step)
+  }, [history, typing, goStep])
 
   // открытие панели
   useEffect(() => {
@@ -161,17 +179,24 @@ export default function Mascot({ open, setOpen, prefill, chapterId, onGoWorks })
   const answer = async (v) => {
     const s = STEPS[step]; if (!s) return
     v = v.trim(); if (!v) return
+    if (v === '← Назад' || v === '← Изменить (Назад)') return goBack()
     if (FAQ_Q.includes(v)) {
       setMsgs((m) => [...m, { from: 'me', text: v }]); const cur = step; setStep(null)
       await say([M.faq.find((f) => f.q === v).a]); setStep(cur); return
     }
     if (step === 'confirm') {
-      setMsgs((m) => [...m, { from: 'me', text: v }])
-      if (v.startsWith('Отправить')) return send()
-      return start()
+      if (v === 'Заполнить заново') return start()
+      if (v.startsWith('Отправить')) {
+        setMsgs((m) => [...m, { from: 'me', text: v }])
+        return send()
+      }
+      return goBack()
     }
     if (s.min && v.length < s.min) { setStep(null); await say(['Чуть подробнее, пожалуйста 🙏']); setStep(step); return }
     if (s.validate && !s.validate(v)) { setMsgs((m) => [...m, { from: 'me', text: v }]); setText(''); setStep(null); await say([s.err]); setStep(step); return }
+
+    setHistory((h) => [...h, { step, lead: { ...leadRef.current }, msgsLength: msgs.length }])
+
     setMsgs((m) => [...m, { from: 'me', text: v }]); setText('')
     const val = s.field === 'type' ? (TYPE_NAME[v] || v) : v
     const l = { ...leadRef.current, [s.field]: val }; setLead(l); leadRef.current = l
@@ -294,6 +319,13 @@ export default function Mascot({ open, setOpen, prefill, chapterId, onGoWorks })
 
       <div ref={panel} className={`chat ${open ? 'open' : ''}`} role="dialog" aria-modal="false" aria-label="Бриф с Каплей" aria-hidden={!open} inert={!open}>
         <header className="chat-head">
+          {history.length > 0 && step !== 'after' && (
+            <button className="chat-back" onClick={goBack} aria-label="Назад к предыдущему шагу" title="Назад">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M19 12H5M12 19l-7-7 7-7" />
+              </svg>
+            </button>
+          )}
           <span className="chat-ava"><Drop mood={mood} /></span>
           <div><b>{M.name} · ассистент {profile.name}</b><small><i />{typing ? 'печатает…' : 'онлайн · ответ в течение дня'}</small></div>
           <button className="chat-x" onClick={() => setOpen(false)} aria-label="Закрыть"><svg width="14" height="14" viewBox="0 0 18 18" aria-hidden="true"><path d="M3 3l12 12M15 3L3 15" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" /></svg></button>
@@ -305,7 +337,16 @@ export default function Mascot({ open, setOpen, prefill, chapterId, onGoWorks })
             <div key={i} className={`chat-msg ${m.from}`}>{m.text}</div>
           ))}
           {typing && <div className="chat-msg bot typing"><span /><span /><span /></div>}
-          {chips && <div className="chat-chips">{chips.map((c) => <button key={c} className={FAQ_Q.includes(c) ? 'faq' : ''} onClick={() => answer(c)}>{c}</button>)}</div>}
+          {step && step !== 'after' && (chips || history.length > 0) && (
+            <div className="chat-chips">
+              {chips?.map((c) => <button key={c} className={FAQ_Q.includes(c) ? 'faq' : ''} onClick={() => answer(c)}>{c}</button>)}
+              {history.length > 0 && (
+                <button className="back" onClick={goBack} title="Вернуться к предыдущему вопросу">
+                  ← Назад
+                </button>
+              )}
+            </div>
+          )}
           {step === 'after' && (
             <div className="chat-chips">
               {sent === 'error' && <a href={profile.telegram} target="_blank" rel="noreferrer">Написать в Telegram ↗</a>}
