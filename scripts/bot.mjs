@@ -50,7 +50,7 @@ const env = { ...process.env, ...loadEnvFile() }
 const TOKEN = env.TELEGRAM_BOT_TOKEN
 const ADMIN_ID = env.TELEGRAM_CHAT_ID ? String(env.TELEGRAM_CHAT_ID) : null
 
-if (!TOKEN) {
+if (!TOKEN && process.argv[1] && process.argv[1].endsWith('bot.mjs')) {
   console.error('[Bot] ❌ TELEGRAM_BOT_TOKEN не задан в .env')
   process.exit(1)
 }
@@ -1724,6 +1724,10 @@ async function handleTextMessage(msg) {
 let isRunning = false
 
 export async function startBot() {
+  if (!TOKEN) {
+    console.warn('[Bot] ⚠️ TELEGRAM_BOT_TOKEN не задан в окружении')
+    return
+  }
   if (isRunning) return
   isRunning = true
 
