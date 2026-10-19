@@ -180,7 +180,7 @@ export const projects = [
    Настройка бота: см. README → «Маскот и Telegram-бот» */
 export const mascot = {
   name: 'Капля',
-  endpoint: '/api/lead',                      // эндпоинт заявки (Netlify / Vercel / serverless)
+  endpoint: 'https://mercury-lead.jimbososok.workers.dev',                      // шлюз заявок Cloudflare Worker
   hints: {                                    // реплики Капли на разделах (один раз). Ключи: home, services, works, process, reviews, about, contact
     home: 'Привет! Я Капля 💧 Кинь задачу — сразу передам её в Telegram.',
     about: 'Хочешь так же? Жми на меня — соберём бриф за минуту.',
