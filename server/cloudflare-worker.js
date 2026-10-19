@@ -38,10 +38,25 @@ export default {
       const botToken = env.TELEGRAM_BOT_TOKEN || 'YOUR_TELEGRAM_BOT_TOKEN'
       const chatId = env.TELEGRAM_CHAT_ID || 'YOUR_TELEGRAM_CHAT_ID'
 
+      // Защита от спама и флуда
+      const cut = (s, n) => String(s ?? '').trim().slice(0, n)
+      const contact = cut(data.contact, 120)
+      const task = cut(data.task, 1200)
+      if (!contact || !task) {
+        return new Response(JSON.stringify({ ok: false, error: 'missing_fields' }), { status: 400, headers: cors })
+      }
+
+      const name = cut(data.name, 80) || 'Аноним'
+      const type = cut(data.type, 60) || 'Не указан'
+      const ref = cut(data.ref, 80)
+      const budget = cut(data.budget, 60) || 'Не указан'
+      const deadline = cut(data.deadline, 60) || 'Не указан'
+      const page = cut(data.page, 300)
+
       const esc = (s = '') => String(s ?? '').replace(/[&<>]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[ch]))
 
       let tg = null
-      const c = String(data.contact || '').trim()
+      const c = contact
       if (/^@?[\w\d_]{4,}$/.test(c) && !/^\d+$/.test(c)) tg = c.replace(/^@/, '')
       else {
         const m = c.match(/(?:t\.me|telegram\.me)\/([\w\d_]{4,})/i)
@@ -50,13 +65,13 @@ export default {
 
       const text = [
         '🔥 <b>Новая заявка с сайта</b>', '',
-        `👤 <b>${esc(data.name || 'Аноним')}</b>`,
-        `📬 ${esc(data.contact)}`,
-        `🧩 ${esc(data.type || 'Не указан')}${data.ref ? ` (как «${esc(data.ref)}»)` : ''}`,
-        `📝 ${esc(data.task)}`,
-        `💰 ${esc(data.budget || 'Не указан')}`,
-        `⏰ ${esc(data.deadline || 'Не указан')}`,
-        '', `<i>${esc(data.page || '')}</i>`,
+        `👤 <b>${esc(name)}</b>`,
+        `📬 ${esc(contact)}`,
+        `🧩 ${esc(type)}${ref ? ` (как «${esc(ref)}»)` : ''}`,
+        `📝 ${esc(task)}`,
+        `💰 ${esc(budget)}`,
+        `⏰ ${esc(deadline)}`,
+        '', `<i>${esc(page)}</i>`,
       ].join('\n')
 
       const buttons = []
