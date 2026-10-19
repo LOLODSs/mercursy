@@ -21,8 +21,8 @@ export default async (req, context) => {
   try {
     const body = await req.json()
     const env = {
-      TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN || '8943025919:AAEgsA7CYUrursO7ihR2sMVd4BoPDG1Gas4',
-      TELEGRAM_CHAT_ID: process.env.TELEGRAM_CHAT_ID || '1031568361',
+      TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN,
+      TELEGRAM_CHAT_ID: process.env.TELEGRAM_CHAT_ID,
     }
     const ip = req.headers.get('x-forwarded-for') || req.headers.get('client-ip') || 'x'
     const [status, data] = await sendLead(body, env, ip)

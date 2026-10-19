@@ -35,8 +35,8 @@ export default {
         return new Response(JSON.stringify({ ok: true }), { headers: cors })
       }
 
-      const botToken = env.TELEGRAM_BOT_TOKEN || '8943025919:AAEgsA7CYUrursO7ihR2sMVd4BoPDG1Gas4'
-      const chatId = env.TELEGRAM_CHAT_ID || '1031568361'
+      const botToken = env.TELEGRAM_BOT_TOKEN || 'YOUR_TELEGRAM_BOT_TOKEN'
+      const chatId = env.TELEGRAM_CHAT_ID || 'YOUR_TELEGRAM_CHAT_ID'
 
       const esc = (s = '') => String(s ?? '').replace(/[&<>]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[ch]))
 

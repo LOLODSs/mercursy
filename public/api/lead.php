@@ -49,10 +49,6 @@ foreach ($envCandidates as $envFile) {
     }
 }
 
-// Дефолтные значения проекта (на случай, если .env не загружен на хостинг)
-if (!$botToken) $botToken = '8943025919:AAEgsA7CYUrursO7ihR2sMVd4BoPDG1Gas4';
-if (!$chatId) $chatId = '1031568361';
-
 if (!$botToken || !$chatId) {
     http_response_code(503);
     echo json_encode(['ok' => false, 'error' => 'Telegram credentials not configured']);

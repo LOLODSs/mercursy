@@ -58,8 +58,8 @@ export async function sendLead(raw, env, ip = 'x') {
     task: cut(raw.task, 1200), budget: cut(raw.budget, 60), deadline: cut(raw.deadline, 60), page: cut(raw.page, 300),
   }
   if (!l.contact || !l.task) return [400, { error: 'missing_fields' }]
-  const botToken = env.TELEGRAM_BOT_TOKEN || '8943025919:AAEgsA7CYUrursO7ihR2sMVd4BoPDG1Gas4'
-  const chatId = env.TELEGRAM_CHAT_ID || '1031568361'
+  const botToken = env.TELEGRAM_BOT_TOKEN
+  const chatId = env.TELEGRAM_CHAT_ID
   if (!botToken || !chatId) return [503, { error: 'not_configured' }]
   let saved = null
   try { saved = addLead(l) } catch (e) { console.warn('CRM save error', e.message) }

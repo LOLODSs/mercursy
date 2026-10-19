@@ -180,8 +180,8 @@ export default function Mascot({ open, setOpen, prefill, chapterId, onGoWorks })
 
   const sendDirectTelegram = async (payload) => {
     try {
-      const token = import.meta.env?.VITE_TELEGRAM_BOT_TOKEN || '8943025919:AAEgsA7CYUrursO7ihR2sMVd4BoPDG1Gas4'
-      const chatId = import.meta.env?.VITE_TELEGRAM_CHAT_ID || '1031568361'
+      const token = import.meta.env?.VITE_TELEGRAM_BOT_TOKEN || ''
+      const chatId = import.meta.env?.VITE_TELEGRAM_CHAT_ID || ''
       if (!token || !chatId) return false
 
       let tg = null
