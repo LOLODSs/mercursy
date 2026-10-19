@@ -743,3 +743,16 @@ a{color:inherit}
   .chat{background:#0a0a0c}
   .chat-chips button,.chat-chips a{white-space:normal;text-align:left;overflow-wrap:anywhere;max-width:100%}
 }
+
+/* Скрываем служебные бейджи и Netlify Drawer */
+netlify-drawer,
+iframe#netlify-drawer,
+[data-netlify-drawer],
+.netlify-badge,
+#netlify-badge,
+[class*="netlify-drawer"] {
+  display: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
+}
