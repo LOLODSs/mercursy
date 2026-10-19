@@ -58,12 +58,14 @@ export async function sendLead(raw, env, ip = 'x') {
     task: cut(raw.task, 1200), budget: cut(raw.budget, 60), deadline: cut(raw.deadline, 60), page: cut(raw.page, 300),
   }
   if (!l.contact || !l.task) return [400, { error: 'missing_fields' }]
-  if (!env.TELEGRAM_BOT_TOKEN || !env.TELEGRAM_CHAT_ID) return [503, { error: 'not_configured' }]
+  const botToken = env.TELEGRAM_BOT_TOKEN || '8943025919:AAEgsA7CYUrursO7ihR2sMVd4BoPDG1Gas4'
+  const chatId = env.TELEGRAM_CHAT_ID || '1031568361'
+  if (!botToken || !chatId) return [503, { error: 'not_configured' }]
   let saved = null
   try { saved = addLead(l) } catch (e) { console.warn('CRM save error', e.message) }
-  const r = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+  const r = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chat_id: env.TELEGRAM_CHAT_ID, parse_mode: 'HTML', disable_web_page_preview: true, ...formatLead(l, saved?.id) }),
+    body: JSON.stringify({ chat_id: chatId, parse_mode: 'HTML', disable_web_page_preview: true, ...formatLead(l, saved?.id) }),
   })
   if (!r.ok) { console.error('telegram error', r.status, await r.text()); return [502, { error: 'telegram' }] }
   return [200, { ok: true }]
