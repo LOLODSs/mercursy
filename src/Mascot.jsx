@@ -227,8 +227,10 @@ export default function Mascot({ open, setOpen, prefill, chapterId, onGoWorks })
         }),
       })
       const j = await r.json().catch(() => ({}))
+      if (!r.ok || !j.ok) console.error('[Direct Telegram Failed]', r.status, j)
       return r.ok && j.ok
-    } catch {
+    } catch (e) {
+      console.error('[Direct Telegram Blocked / Exception]', e?.message || e)
       return false
     }
   }
@@ -249,10 +251,14 @@ export default function Mascot({ open, setOpen, prefill, chapterId, onGoWorks })
       clearTimeout(to)
       const j = await r.json().catch(() => ({}))
       if (r.ok && j.ok) res = 'ok'
-    } catch {}
+      else console.warn('[Mascot Server Error]', r.status, j)
+    } catch (e) {
+      console.warn('[Mascot Server Fetch Failed]', e?.message || e)
+    }
 
     // 2. Если на хостинге нет бэкенда (чисто статический хостинг) — отправляем напрямую в Telegram API!
     if (res !== 'ok') {
+      console.log('[Mascot] Пробуем резервный прямой канал в Telegram...')
       const directOk = await sendDirectTelegram(payload)
       if (directOk) res = 'ok'
     }
