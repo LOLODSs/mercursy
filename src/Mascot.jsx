@@ -178,12 +178,69 @@ export default function Mascot({ open, setOpen, prefill, chapterId, onGoWorks })
     goStep(s.next, l)
   }
 
+  const sendDirectTelegram = async (payload) => {
+    try {
+      const token = import.meta.env?.VITE_TELEGRAM_BOT_TOKEN || '8943025919:AAEgsA7CYUrursO7ihR2sMVd4BoPDG1Gas4'
+      const chatId = import.meta.env?.VITE_TELEGRAM_CHAT_ID || '1031568361'
+      if (!token || !chatId) return false
+
+      let tg = null
+      const c = String(payload.contact || '').trim()
+      if (/^@?[\w\d_]{4,}$/.test(c) && !/^\d+$/.test(c)) tg = c.replace(/^@/, '')
+      else {
+        const m = c.match(/(?:t\.me|telegram\.me)\/([\w\d_]{4,})/i)
+        if (m) tg = m[1]
+      }
+
+      const esc = (s = '') => String(s ?? '').replace(/[&<>]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[ch]))
+      const text = [
+        '🔥 <b>Новая заявка с сайта</b>', '',
+        `👤 <b>${esc(payload.name || 'Аноним')}</b>`,
+        `📬 ${esc(payload.contact)}`,
+        `🧩 ${esc(payload.type || 'Не указан')}${payload.ref ? ` (как «${esc(payload.ref)}»)` : ''}`,
+        `📝 ${esc(payload.task)}`,
+        `💰 ${esc(payload.budget || 'Не указан')}`,
+        `⏰ ${esc(payload.deadline || 'Не указан')}`,
+        '', `<i>${esc(payload.page || location.href)}</i>`,
+      ].join('\n')
+
+      const buttons = []
+      if (tg) buttons.push([{ text: '✍️ Ответить клиенту', url: `https://t.me/${tg}` }])
+      buttons.push([
+        { text: '🟡 В работу', callback_data: 'crm:work:lead' },
+        { text: '🟢 Сдан', callback_data: 'crm:done:lead' },
+        { text: '⚪ В архив', callback_data: 'crm:archive:lead' },
+      ])
+      buttons.push([
+        { text: '📋 Копировать бриф', callback_data: 'crm:copy:lead' },
+      ])
+
+      const r = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text,
+          parse_mode: 'HTML',
+          disable_web_page_preview: true,
+          reply_markup: { inline_keyboard: buttons },
+        }),
+      })
+      const j = await r.json().catch(() => ({}))
+      return r.ok && j.ok
+    } catch {
+      return false
+    }
+  }
+
   const send = async () => {
     setStep(null); setMood('talk'); setTyping(true)
     const payload = { ...leadRef.current, page: location.href, website: hp.current?.value || '', ts: new Date().toISOString() }
     let res = 'error'
+
+    // 1. Сначала пробуем серверный эндпоинт (Vercel, Node.js server.js, Cloudflare Worker)
     try {
-      const ac = new AbortController(); const to = setTimeout(() => ac.abort(), 12000)
+      const ac = new AbortController(); const to = setTimeout(() => ac.abort(), 8000)
       let r = await fetch(M.endpoint, { signal: ac.signal, method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
       if ((r.status === 404 || r.status === 405) && M.endpoint === '/api/lead') {
         const rPhp = await fetch('./api/lead.php', { signal: ac.signal, method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).catch(() => null)
@@ -191,9 +248,15 @@ export default function Mascot({ open, setOpen, prefill, chapterId, onGoWorks })
       }
       clearTimeout(to)
       const j = await r.json().catch(() => ({}))
-      // демо-режим: бэкенд ещё не подключён и сайт в режиме превью (site.showDemoBadges)
-      res = r.ok && j.ok ? 'ok' : (site.showDemoBadges && ([404, 405, 501, 502, 503].includes(r.status) || j.error === 'not_configured')) ? 'demo' : 'error'
-    } catch { res = 'error' }
+      if (r.ok && j.ok) res = 'ok'
+    } catch {}
+
+    // 2. Если на хостинге нет бэкенда (чисто статический хостинг) — отправляем напрямую в Telegram API!
+    if (res !== 'ok') {
+      const directOk = await sendDirectTelegram(payload)
+      if (directOk) res = 'ok'
+    }
+
     await sleep(600); setTyping(false)
     setSent(res)
     if (res === 'ok') { setMood('happy'); await say(['Готово! 🚀 Заявка уже в Telegram у ' + profile.name + '.', 'Ответ — в течение дня. А пока можно посмотреть работы.']) }
