@@ -36,7 +36,11 @@ export default {
       }
 
       const botToken = env.TELEGRAM_BOT_TOKEN || 'YOUR_TELEGRAM_BOT_TOKEN'
-      const chatId = env.TELEGRAM_CHAT_ID || 'YOUR_TELEGRAM_CHAT_ID'
+      const rawChatIds = env.TELEGRAM_CHAT_ID || 'YOUR_TELEGRAM_CHAT_ID'
+      const chatIds = String(rawChatIds)
+        .split(',')
+        .map((id) => id.trim())
+        .filter(Boolean)
 
       // Защита от спама и флуда
       const cut = (s, n) => String(s ?? '').trim().slice(0, n)
@@ -85,21 +89,25 @@ export default {
         { text: '📋 Копировать бриф', callback_data: 'crm:copy:lead' },
       ])
 
-      const tgRes = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chat_id: chatId,
-          text,
-          parse_mode: 'HTML',
-          disable_web_page_preview: true,
-          reply_markup: { inline_keyboard: buttons },
-        }),
-      })
+      const sendTasks = chatIds.map((id) =>
+        fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: id,
+            text,
+            parse_mode: 'HTML',
+            disable_web_page_preview: true,
+            reply_markup: { inline_keyboard: buttons },
+          }),
+        }).then((r) => r.json()).catch((err) => ({ ok: false, error: err.message }))
+      )
 
-      const tgData = await tgRes.json()
-      return new Response(JSON.stringify(tgData), {
-        status: tgRes.status,
+      const results = await Promise.all(sendTasks)
+      const isAnyOk = results.some((r) => r && r.ok)
+
+      return new Response(JSON.stringify({ ok: isAnyOk, results }), {
+        status: isAnyOk ? 200 : 500,
         headers: { ...cors, 'Content-Type': 'application/json' },
       })
     } catch (err) {
