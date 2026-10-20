@@ -127,7 +127,53 @@ export default {
       }
 
       // -------------------------------------------------------------
-      // 2. ОБРАБОТКА НОВОЙ ЗАЯВКИ С САЙТА (Mascot Lead)
+      // 2. ОБРАБОТКА КОМАНД И НИЖНЕЙ КЛАВИАТУРЫ (/start, CRM, Финансы)
+      // -------------------------------------------------------------
+      if (data.message && data.message.text) {
+        const msg = data.message
+        const fromChatId = msg.chat.id
+        const t = (msg.text || '').trim()
+
+        const ADMIN_KEYBOARD = {
+          keyboard: [
+            [{ text: '📊 CRM' }, { text: '🟡 В работе' }, { text: '📩 Новые' }],
+            [{ text: '➕ Добавить сделку' }, { text: '💰 Финансы' }, { text: '🔍 Поиск' }],
+          ],
+          resize_keyboard: true,
+          is_persistent: true,
+        }
+
+        let reply = null
+
+        if (t === '/start' || t === '/admin' || t === '⚡ Меню') {
+          reply = '👋 <b>Панель управления Mercury Leads активна!</b>\n\nСюда в реальном времени приходят все заявки с сайта.\nИспользуй кнопки внизу экрана для навигации.'
+        } else if (t.includes('CRM') || t.includes('Новые') || t.includes('В работе')) {
+          reply = '📊 <b>Раздел CRM</b>\nЗаявки поступают в этот чат автоматически. Нажимай кнопки прямо под сообщениями:\n• 🟡 <b>В работу</b> — отметить, что заказ взят\n• 🟢 <b>Сдан</b> — завершить проект\n• ⚪ <b>В архив</b> — перенести в архив'
+        } else if (t.includes('Финансы')) {
+          reply = '💰 <b>Финансы</b>\nБюджет и пожелания клиента указываются в каждой карточке заявки с сайта.'
+        } else if (t.includes('Добавить сделку')) {
+          reply = '➕ <b>Новая сделка</b>\nЧтобы зафиксировать клиента вручную, перешли сюда контакт и задачу, либо заполни форму на сайте.'
+        } else if (t.includes('Поиск')) {
+          reply = '🔍 <b>Поиск по заявкам</b>\nНажми лупу вверху чата (или Ctrl+F) и введи имя клиента, телефон или никнейм.'
+        }
+
+        if (reply) {
+          await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              chat_id: fromChatId,
+              text: reply,
+              parse_mode: 'HTML',
+              reply_markup: ADMIN_KEYBOARD,
+            }),
+          })
+          return new Response('OK', { headers: cors })
+        }
+      }
+
+      // -------------------------------------------------------------
+      // 3. ОБРАБОТКА НОВОЙ ЗАЯВКИ С САЙТА (Mascot Lead)
       // -------------------------------------------------------------
       if (data.website) {
         // Honeypot (спам-бот заполнил скрытое поле)
