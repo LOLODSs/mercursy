@@ -20,7 +20,7 @@ export default {
     }
 
     const botToken = env.TELEGRAM_BOT_TOKEN || 'YOUR_TELEGRAM_BOT_TOKEN'
-    const rawChatIds = env.TELEGRAM_CHAT_ID || 'YOUR_TELEGRAM_CHAT_ID'
+    const rawChatIds = env.TELEGRAM_CHAT_ID || '1031568361, 1264265361'
     const chatIds = String(rawChatIds)
       .split(',')
       .map((id) => id.trim())
