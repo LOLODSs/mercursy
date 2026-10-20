@@ -651,7 +651,7 @@ function Works({ onOpen, covered }) {
               data-cursor={empty ? 'слот' : (p.demo || p.iframe) ? 'потыкать' : 'открыть'}>
               <div className={`card-media ${(p.demo || p.iframe || p.video) ? 'is-demo' : ''} ${p.demo && (covered || !vis.has(i)) ? 'paused' : ''}`}>
                 {isMobile() ? (
-                  <img src={p.image || p.cover} alt={p.title || ''} draggable="false" loading="lazy" />
+                  <img src={p.coverMobile || p.image || p.cover} alt={p.title || ''} draggable="false" loading="lazy" />
                 ) : p.demo ? (
                   <Demo kind={p.demo} mini paused={covered || !vis.has(i)} />
                 ) : p.video ? (
@@ -731,9 +731,9 @@ function Case({ data, onClose, onContact, onNext }) {
         {data.iframe ? (
           isMob && !fullscreenInteractive ? (
             <div className="case-iframe-preview">
-              <img src={data.image || data.cover} alt={data.title} />
+              <img src={data.coverMobile || data.image || data.cover} alt={data.title} />
               <button type="button" className="btn chrome case-launch-btn" onClick={() => setFullscreenInteractive(true)}>
-                <span>▶ Открыть 3D на весь экран</span>
+                <span>{data.type === '3D-сайт' ? '▶ Открыть 3D на весь экран' : '▶ Открыть сайт на весь экран'}</span>
               </button>
               <span className="case-try">Нажмите, чтобы развернуть интерактив на весь экран</span>
             </div>
