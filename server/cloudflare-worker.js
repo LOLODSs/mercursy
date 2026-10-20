@@ -9,7 +9,9 @@
  *    • ➕ Добавить сделку — ручное создание проекта в 1 сообщение
  *    • 💰 Финансы — отчёт по доходам, пайплайну и среднему чеку
  *    • 🔍 Поиск — быстрый поиск клиента по имени, @юзернейму или телефону
- * 3. Хранение в Cloudflare KV (если привязан CRM) + локальный кеш.
+ * 3. Авто-распознавание сделок: нажатие «🟡 В работу» под ЛЮБЫМ сообщением
+ *    (даже старым!) автоматически вносит проект в базу CRM.
+ * 4. Хранение в Cloudflare KV (если привязан CRM) + локальный кеш.
  */
 
 const DEFAULT_BOT_TOKEN = '8943025919:AAF8v9ZAxctpJeTu-AAOsg4glTLmNAcBMc4'
@@ -26,6 +28,7 @@ const ADMIN_KEYBOARD = {
 
 // Утилиты форматирования
 const esc = (s = '') => String(s ?? '').replace(/[&<>]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[ch]))
+const stripHtml = (s = '') => String(s || '').replace(/<[^>]*>/g, '').trim()
 
 function parseAmount(str) {
   if (!str) return 0
@@ -60,6 +63,71 @@ function statusBadge(status) {
     case 'done': return '🟢 Сдан'
     case 'archived': return '⚪ В архиве'
     case 'new': default: return '📩 Новый'
+  }
+}
+
+// Автоматический парсинг сделки из текста Telegram-сообщения
+function parseLeadFromMessage(rawText, messageId) {
+  if (!rawText) return null
+  const clean = stripHtml(rawText)
+  const lines = clean.split('\n').map((l) => l.trim()).filter(Boolean)
+
+  let name = ''
+  let contact = ''
+  let type = ''
+  let task = ''
+  let budget = ''
+  let deadline = ''
+
+  for (const line of lines) {
+    if (line.includes('👤')) {
+      name = line.replace(/.*👤\s*(?:Клиент:\s*)?/, '').trim()
+    } else if (line.includes('📬')) {
+      contact = line.replace(/.*📬\s*(?:Контакт:\s*)?/, '').trim()
+    } else if (line.includes('🧩')) {
+      type = line.replace(/.*🧩\s*(?:Тип проекта:\s*)?/, '').trim()
+    } else if (line.includes('📝')) {
+      task = line.replace(/.*📝\s*(?:Задача:\s*)?/, '').trim()
+    } else if (line.includes('💰')) {
+      budget = line.replace(/.*💰\s*(?:Бюджет:\s*)?/, '').trim()
+    } else if (line.includes('⏰')) {
+      deadline = line.replace(/.*⏰\s*(?:Сроки:\s*)?/, '').trim()
+    }
+  }
+
+  if (!name) name = 'Клиент'
+  if (!contact) {
+    const tgMatch = clean.match(/@([a-zA-Z0-9_]{4,})/)
+    if (tgMatch) contact = '@' + tgMatch[1]
+    else {
+      const ph = clean.match(/(?:\+7|8)[\s(-]*\d{3}[\s)-]*\d{3}[\s-]*\d{2}[\s-]*\d{2}/)
+      contact = ph ? ph[0] : 'Контакт в сообщении'
+    }
+  }
+  if (!type) type = 'Индивидуальный проект'
+  if (!task) task = 'Заявка из чата'
+  if (!budget) budget = 'По договорённости'
+  if (!deadline) deadline = 'По графику'
+
+  const seed = `${contact}_${name}`
+  let hash = 0
+  for (let i = 0; i < seed.length; i++) {
+    hash = (hash << 5) - hash + seed.charCodeAt(i)
+    hash |= 0
+  }
+  const id = 'm_' + Math.abs(hash).toString(36)
+
+  return {
+    id,
+    name,
+    contact,
+    type,
+    task,
+    budget,
+    deadline,
+    status: 'in_progress',
+    createdAt: new Date().toISOString(),
+    createdBy: 'Telegram Action',
   }
 }
 
@@ -116,7 +184,7 @@ async function setAdminState(env, chatId, state) {
 }
 
 // Рендереры интерфейса
-function renderAdminDashboard(leads) {
+function renderAdminDashboard(leads, hasKV) {
   const total = leads.length
   const newLeads = leads.filter((l) => l.status === 'new' || !l.status)
   const inWork = leads.filter((l) => l.status === 'in_progress')
@@ -128,6 +196,7 @@ function renderAdminDashboard(leads) {
 
   const text = [
     '📊 <b>Панель управления Mercury CRM</b>',
+    hasKV ? '<i>💾 Облачная база KV: подключена</i>' : '<i>⚠️ База KV не подключена (данные во временной памяти)</i>',
     '',
     `• 📩 Новые заявки: <b>${newLeads.length}</b>`,
     `• 🟡 В разработке: <b>${inWork.length}</b> (${formatRubles(inWorkSum)})`,
@@ -173,7 +242,7 @@ function renderLeadList(leads, status) {
       '',
       'Здесь пока нет сделок.',
       status === 'in_progress'
-        ? '💡 Чтобы перевести заявку в работу, нажми «🟡 В работу» под карточкой любой новой заявки или добавь проект вручную.'
+        ? '💡 Чтобы перевести заявку в работу, нажми «🟡 В работу» под карточкой любой заявки в чате или нажми «➕ Создать сделку» ниже.'
         : '',
     ].filter(Boolean).join('\n')
 
@@ -210,7 +279,7 @@ function renderLeadList(leads, status) {
     { text: '🔙 В главное меню', callback_data: 'crm:home' },
   ])
 
-  return { text: lines.join('\n'), reply_markup: { inline_keyboard: buttons } }
+  return { text, reply_markup: { inline_keyboard: buttons } }
 }
 
 function renderLeadCard(lead) {
@@ -351,7 +420,7 @@ function renderSearchResults(leads, query) {
   ])
   buttons.push([{ text: '🔙 В главное меню', callback_data: 'crm:home' }])
 
-  return { text: lines.join('\n'), reply_markup: { inline_keyboard: buttons } }
+  return { text, reply_markup: { inline_keyboard: buttons } }
 }
 
 function parseManualDeal(text) {
@@ -404,7 +473,9 @@ export default {
     }
 
     if (request.method === 'GET') {
-      return new Response(JSON.stringify({ ok: true, service: 'mercury-gateway', crm: true }), {
+      const leads = await getLeads(env)
+      const hasKV = Boolean(env && env.CRM)
+      return new Response(JSON.stringify({ ok: true, service: 'mercury-gateway', crm: true, kvBound: hasKV, leadsCount: leads.length }), {
         headers: { ...cors, 'Content-Type': 'application/json' },
       })
     }
@@ -415,6 +486,7 @@ export default {
 
     try {
       const data = await request.json().catch(() => ({}))
+      const hasKV = Boolean(env && env.CRM)
 
       // =============================================================
       // 1. ИНТЕРАКТИВНЫЕ ДЕЙСТВИЯ (Callback Queries)
@@ -435,7 +507,7 @@ export default {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ callback_query_id: cq.id }),
           })
-          const { text, reply_markup } = renderAdminDashboard(leads)
+          const { text, reply_markup } = renderAdminDashboard(leads, hasKV)
           await fetch(`https://api.telegram.org/bot${botToken}/editMessageText`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -510,18 +582,37 @@ export default {
           return new Response('OK', { headers: cors })
         }
 
-        // 1.4 Смена статуса из карточки
+        // 1.4 Смена статуса из карточки проекта
         if (cqData.startsWith('crm:status:')) {
           const [, , leadId, newStatus] = cqData.split(':')
-          const lead = leads.find((l) => l.id === leadId)
-          if (lead) {
+          let lead = leads.find((l) => l.id === leadId)
+
+          // Если лид не найден (например, старое сообщение), пробуем распарсить
+          if (!lead && msg && msg.text) {
+            lead = parseLeadFromMessage(msg.text, msg.message_id)
+            if (lead) {
+              const existingIdx = leads.findIndex((l) => l.contact === lead.contact && l.name === lead.name)
+              if (existingIdx >= 0) {
+                leads[existingIdx].status = newStatus
+                leads[existingIdx].updatedAt = new Date().toISOString()
+                leads[existingIdx].updatedBy = fromUser
+                lead = leads[existingIdx]
+              } else {
+                lead.status = newStatus
+                lead.updatedAt = new Date().toISOString()
+                lead.updatedBy = fromUser
+                leads.unshift(lead)
+              }
+              await saveLeads(env, leads)
+            }
+          } else if (lead) {
             lead.status = newStatus
             lead.updatedAt = new Date().toISOString()
             lead.updatedBy = fromUser
             await saveLeads(env, leads)
           }
 
-          const toast = newStatus === 'in_progress' ? '🟡 Взято в работу!' : newStatus === 'done' ? '🟢 Проект сдан!' : '⚪ Перенесён в архив'
+          const toast = newStatus === 'in_progress' ? `🟡 В работе (${fromUser})` : newStatus === 'done' ? `🟢 Проект сдан (${fromUser})` : `⚪ В архиве (${fromUser})`
           await fetch(`https://api.telegram.org/bot${botToken}/answerCallbackQuery`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -545,7 +636,7 @@ export default {
           return new Response('OK', { headers: cors })
         }
 
-        // 1.5 Быстрые кнопки под сообщением с заявкой
+        // 1.5 Быстрые кнопки под сообщением с заявкой (🟡 В работу, 🟢 Сдан, ⚪ В архив)
         if (cqData.startsWith('crm:work') || cqData.startsWith('crm:done') || cqData.startsWith('crm:archive')) {
           let targetStatus = 'in_progress'
           let toast = `🟡 Взято в работу (${fromUser})`
@@ -562,20 +653,41 @@ export default {
           }
 
           const leadId = cqData.includes(':') ? cqData.split(':')[1] : null
-          if (leadId) {
-            const lead = leads.find((l) => l.id === leadId)
-            if (lead) {
-              lead.status = targetStatus
-              lead.updatedAt = new Date().toISOString()
-              lead.updatedBy = fromUser
+          let lead = leadId ? leads.find((l) => l.id === leadId) : null
+
+          // ВАЖНО: Если заявки ещё нет в базе (старое сообщение или сброс кеша),
+          // автоматически парсим её из сообщения и вносим в CRM прямо сейчас!
+          if (!lead && msg && msg.text) {
+            const parsed = parseLeadFromMessage(msg.text, msg.message_id)
+            if (parsed) {
+              const existingIdx = leads.findIndex(
+                (l) => (parsed.contact && l.contact === parsed.contact) || (parsed.name && l.name === parsed.name)
+              )
+              if (existingIdx >= 0) {
+                leads[existingIdx].status = targetStatus
+                leads[existingIdx].updatedAt = new Date().toISOString()
+                leads[existingIdx].updatedBy = fromUser
+                lead = leads[existingIdx]
+              } else {
+                parsed.status = targetStatus
+                parsed.updatedAt = new Date().toISOString()
+                parsed.updatedBy = fromUser
+                lead = parsed
+                leads.unshift(lead)
+              }
               await saveLeads(env, leads)
             }
+          } else if (lead) {
+            lead.status = targetStatus
+            lead.updatedAt = new Date().toISOString()
+            lead.updatedBy = fromUser
+            await saveLeads(env, leads)
           }
 
           await fetch(`https://api.telegram.org/bot${botToken}/answerCallbackQuery`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ callback_query_id: cq.id, text: toast }),
+            body: JSON.stringify({ callback_query_id: cq.id, text: toast + ' и сохранено в CRM!' }),
           })
 
           if (msg && msg.text) {
@@ -589,6 +701,22 @@ export default {
               `$1\n\n${statusBadgeText}`
             )
 
+            // Обновляем кнопки сообщения, привязывая ID лида
+            const currentRows = msg.reply_markup?.inline_keyboard || []
+            const linkRow = currentRows.find((r) => r.some((b) => b.url))
+            const newKeyboard = [
+              ...(linkRow ? [linkRow] : []),
+              [
+                { text: targetStatus === 'in_progress' ? '✅ В работе' : '🟡 В работу', callback_data: `crm:status:${lead?.id || 'lead'}:in_progress` },
+                { text: targetStatus === 'done' ? '✅ Сдан' : '🟢 Сдан', callback_data: `crm:status:${lead?.id || 'lead'}:done` },
+                { text: targetStatus === 'archived' ? '✅ В архив' : '⚪ В архив', callback_data: `crm:status:${lead?.id || 'lead'}:archived` },
+              ],
+              [
+                { text: '📁 Открыть в CRM', callback_data: `crm:view:${lead?.id || 'lead'}` },
+                { text: '📋 Копировать бриф', callback_data: `crm:copy:${lead?.id || 'lead'}` },
+              ],
+            ]
+
             await fetch(`https://api.telegram.org/bot${botToken}/editMessageText`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -597,7 +725,7 @@ export default {
                 message_id: msg.message_id,
                 text: updated,
                 parse_mode: 'HTML',
-                reply_markup: msg.reply_markup,
+                reply_markup: { inline_keyboard: newKeyboard },
                 disable_web_page_preview: true,
               }),
             })
@@ -611,7 +739,7 @@ export default {
           const lead = leadId ? leads.find((l) => l.id === leadId) : null
           const briefText = lead
             ? `Клиент: ${lead.name}\nКонтакт: ${lead.contact}\nБюджет: ${lead.budget}\nЗадача: ${lead.task}`
-            : (msg?.text || 'Данные заявки скопированы')
+            : (stripHtml(msg?.text || '') || 'Данные заявки скопированы')
 
           await fetch(`https://api.telegram.org/bot${botToken}/answerCallbackQuery`, {
             method: 'POST',
@@ -713,7 +841,7 @@ export default {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ callback_query_id: cq.id, text: 'Действие отменено' }),
           })
-          const { text, reply_markup } = renderAdminDashboard(leads)
+          const { text, reply_markup } = renderAdminDashboard(leads, hasKV)
           await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -837,7 +965,7 @@ export default {
         // 2.3 Команды нижней клавиатуры
         if (t === '/start' || t === '/admin' || t === '⚡ Меню' || t === '📊 CRM') {
           await setAdminState(env, fromChatId, null)
-          const { text, reply_markup } = renderAdminDashboard(leads)
+          const { text, reply_markup } = renderAdminDashboard(leads, hasKV)
           await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -846,16 +974,6 @@ export default {
               text,
               parse_mode: 'HTML',
               reply_markup,
-            }),
-          })
-          // Обновляем нижнюю клавиатуру
-          await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              chat_id: fromChatId,
-              text: '⚡ Клавиатура управления CRM закреплена внизу:',
-              reply_markup: ADMIN_KEYBOARD,
             }),
           })
           return new Response('OK', { headers: cors })
