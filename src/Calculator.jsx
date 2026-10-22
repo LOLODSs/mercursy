@@ -7,7 +7,7 @@ const CORE_TYPES = [
   {
     id: 'website',
     name: 'Сайт / Лендинг',
-    basePrice: 40000,
+    basePrice: 60000,
     baseDays: [5, 7],
     icon: '🌐',
     desc: 'Адаптивный сайт с 3D, плавной анимацией и высокой конверсией',
@@ -15,7 +15,7 @@ const CORE_TYPES = [
   {
     id: 'bot',
     name: 'Telegram-бот',
-    basePrice: 25000,
+    basePrice: 35000,
     baseDays: [3, 5],
     icon: '🤖',
     desc: 'Бот для приёма заявок, продаж, поддержки клиентов и уведомлений',
@@ -23,7 +23,7 @@ const CORE_TYPES = [
   {
     id: 'automation',
     name: 'Автоматизация n8n',
-    basePrice: 15000,
+    basePrice: 25000,
     baseDays: [2, 4],
     icon: '⚡',
     desc: 'Связка сервисов, авто-обработка заявок, синхронизация с CRM и базами',
@@ -34,7 +34,7 @@ const OPTIONS = [
   {
     id: 'graphics3d',
     title: '3D-графика и WebGL',
-    price: 15000,
+    price: 25000,
     days: 2,
     icon: '🌌',
     desc: 'Интерактивные 3D-модели (Three.js), жидкие эффекты, кастомный курсор',
@@ -43,7 +43,7 @@ const OPTIONS = [
   {
     id: 'payments',
     title: 'Приём платежей',
-    price: 10000,
+    price: 15000,
     days: 1,
     icon: '💳',
     desc: 'ЮKassa, Telegram Stars, СБП, Robokassa с чеками',
@@ -52,7 +52,7 @@ const OPTIONS = [
   {
     id: 'ai',
     title: 'AI-ассистент (ChatGPT/Claude)',
-    price: 15000,
+    price: 20000,
     days: 2,
     icon: '🧠',
     desc: 'Умный ассистент с обучением на данных твоей компании',
@@ -61,7 +61,7 @@ const OPTIONS = [
   {
     id: 'crm',
     title: 'CRM и базы данных',
-    price: 10000,
+    price: 15000,
     days: 1,
     icon: '📊',
     desc: 'Google Таблицы, Notion, PostgreSQL или Telegram-админка',
@@ -70,7 +70,7 @@ const OPTIONS = [
   {
     id: 'webapp',
     title: 'Telegram Mini App (WebApp)',
-    price: 15000,
+    price: 25000,
     days: 2,
     icon: '📱',
     desc: 'Интерактивное веб-приложение прямо внутри Telegram',
@@ -79,7 +79,7 @@ const OPTIONS = [
   {
     id: 'n8n_addon',
     title: 'Автоматизация n8n (доп. модуль)',
-    price: 15000,
+    price: 25000,
     days: 2,
     icon: '⚡',
     desc: 'Подключение сценариев n8n, сбор лидов, авто-воронка и вебхуки',
@@ -187,10 +187,10 @@ export default function Calculator({ onClose, onOrder }) {
   let comboDiscount = 0
   let daysScale = 1
   if (selectedTypes.size === 2) {
-    comboDiscount = 5000
+    comboDiscount = 7000
     daysScale = 0.8
   } else if (selectedTypes.size >= 3) {
-    comboDiscount = 10000
+    comboDiscount = 15000
     daysScale = 0.7
   }
 
@@ -278,7 +278,7 @@ export default function Calculator({ onClose, onOrder }) {
             <label className="calc-sec-title">
               <span className="calc-step-num">1</span>
               <span>Что разрабатываем?</span>
-              <small className="calc-sec-sub">Выбирай любые направления — при комбо скидка до 10 000 ₽</small>
+              <small className="calc-sec-sub">Выбирай любые направления — при комбо скидка до 15 000 ₽</small>
             </label>
             <div className="calc-types-grid">
               {CORE_TYPES.map((t) => {
@@ -320,9 +320,9 @@ export default function Calculator({ onClose, onOrder }) {
                 <div className="calc-card-top">
                   <span className="calc-type-icon">💎</span>
                   <span className="calc-pill-badge" style={{ color: '#ff9ad5', borderColor: 'rgba(255,154,213,.4)', background: 'rgba(255,154,213,.15)' }}>
-                    Выгода 10 000 ₽
+                    Выгода 15 000 ₽
                   </span>
-                  <b className="calc-type-price">от 70 000 ₽</b>
+                  <b className="calc-type-price">от 105 000 ₽</b>
                   <span className={`calc-checkbox ${isAllSelected ? 'checked' : ''}`} aria-hidden="true">
                     {isAllSelected && (
                       <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -340,13 +340,13 @@ export default function Calculator({ onClose, onOrder }) {
             {selectedTypes.size === 2 && (
               <div className="calc-combo-alert">
                 <span>🎉</span>
-                <span>Выбрано 2 направления — комбо-скидка <b>–5 000 ₽</b> уже учтена в расчёте!</span>
+                <span>Выбрано 2 направления — комбо-скидка <b>–7 000 ₽</b> уже учтена в расчёте!</span>
               </div>
             )}
             {isAllSelected && (
               <div className="calc-combo-alert calc-combo-alert--max">
                 <span>🚀</span>
-                <span>Выбрана полная экосистема — максимальная скидка <b>–10 000 ₽</b> уже учтена в расчёте!</span>
+                <span>Выбрана полная экосистема — максимальная скидка <b>–15 000 ₽</b> уже учтена в расчёте!</span>
               </div>
             )}
           </section>
