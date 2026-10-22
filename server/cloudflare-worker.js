@@ -356,15 +356,22 @@ function renderLeadList(leads, status) {
   filtered.slice(0, 8).forEach((l, idx) => {
     const budgetStr = esc(l.budget || 'По договорённости')
     const assigneeStr = l.assignee ? ` • 👤 <b>${esc(l.assignee)}</b>` : ''
+    let payBadge = ''
+    if (l.paymentStatus === 'paid_100') payBadge = ' • ✅ 100%'
+    else if (l.paymentStatus === 'prepay_50') payBadge = ' • 💳 Аванс 50%'
+
     lines.push(`<b>${idx + 1}. ${esc(l.name)}</b> (${esc(l.type || 'Проект')})`)
-    lines.push(`• Бюджет: <b>${budgetStr}</b> | ${formatDate(l.createdAt)}${assigneeStr}`)
+    lines.push(`• Бюджет: <b>${budgetStr}</b>${payBadge} | ${formatDate(l.createdAt)}${assigneeStr}`)
     lines.push(`• Контакт: <code>${esc(l.contact)}</code>`)
     lines.push('')
   })
 
-  const buttons = filtered.slice(0, 8).map((l, idx) => [
-    { text: `${idx + 1}. ${l.name} (${l.budget || 'открыть'})`.slice(0, 42), callback_data: `crm:view:${l.id}` },
-  ])
+  const buttons = filtered.slice(0, 8).map((l, idx) => {
+    const icon = l.paymentStatus === 'paid_100' ? '✅' : (l.paymentStatus === 'prepay_50' ? '💳' : '📁')
+    return [
+      { text: `${idx + 1}. ${icon} ${l.name} (${l.budget || 'открыть'})`.slice(0, 42), callback_data: `crm:view:${l.id}` },
+    ]
+  })
   buttons.push([
     { text: '➕ Создать сделку', callback_data: 'crm:add' },
     { text: '🔙 В главное меню', callback_data: 'crm:home' },
@@ -411,6 +418,18 @@ function renderLeadCard(lead) {
     ? `\n📝 <b>Заметки по проекту${notesCountBadge}:</b>\n` + recentNotes.map((n) => `• <i>[${formatDate(n.createdAt)} • ${esc(n.author)}]</i> ${esc(n.text)}`).join('\n')
     : ''
 
+  const budgetNum = parseAmount(lead.budget)
+  let paymentBadge = ''
+  if (lead.paymentStatus === 'paid_100') {
+    paymentBadge = `💳 <b>Оплата:</b> ✅ <b>Оплачено 100%</b> (${formatRubles(budgetNum)})`
+  } else if (lead.paymentStatus === 'prepay_50') {
+    const half = Math.round(budgetNum / 2)
+    const remain = budgetNum - half
+    paymentBadge = `💳 <b>Оплата:</b> 💳 <b>Аванс 50% внесён</b> (${formatRubles(half)})\n⏳ <b>Остаток к доплате:</b> <b>${formatRubles(remain)}</b>`
+  } else {
+    paymentBadge = `💳 <b>Оплата:</b> ⏳ <b>Ожидает аванс</b>`
+  }
+
   const text = [
     `📁 <b>Карточка проекта: ${esc(lead.name)}</b>`,
     `Статус: <b>${statusBadge(lead.status)}</b>`,
@@ -422,6 +441,7 @@ function renderLeadCard(lead) {
     `📝 <b>Задача:</b>\n${esc(lead.task)}`,
     '',
     `💰 <b>Бюджет:</b> <b>${esc(lead.budget || 'По договорённости')}</b>`,
+    paymentBadge,
     `⏰ <b>Сроки:</b> ${esc(lead.deadline || 'По графику')}`,
     `📅 <b>Создан:</b> ${formatDate(lead.createdAt)}`,
     lead.updatedBy ? `🔄 <b>Обновил:</b> ${esc(lead.updatedBy)} (${formatDate(lead.updatedAt)})` : '',
@@ -441,6 +461,24 @@ function renderLeadCard(lead) {
     { text: lead.assignee ? `👤 Ведёт: ${lead.assignee}` : '👤 Взять себе', callback_data: `crm:assign:${lead.id}` },
     { text: '📝 Заметка', callback_data: `crm:note:${lead.id}` },
   ])
+
+  // Кнопки управления оплатой
+  if (lead.paymentStatus === 'paid_100') {
+    buttons.push([
+      { text: '💳 Перевести в аванс 50%', callback_data: `crm:pay:${lead.id}:50` },
+      { text: '🔄 Сбросить оплату', callback_data: `crm:pay:${lead.id}:0` },
+    ])
+  } else if (lead.paymentStatus === 'prepay_50') {
+    buttons.push([
+      { text: '✅ Оплачен 100%', callback_data: `crm:pay:${lead.id}:100` },
+      { text: '🔄 Сбросить оплату', callback_data: `crm:pay:${lead.id}:0` },
+    ])
+  } else {
+    buttons.push([
+      { text: '💳 Внесён аванс 50%', callback_data: `crm:pay:${lead.id}:50` },
+      { text: '✅ Оплачен 100%', callback_data: `crm:pay:${lead.id}:100` },
+    ])
+  }
 
   const statusRow = []
   if (lead.status !== 'in_progress') {
@@ -466,26 +504,65 @@ function renderLeadCard(lead) {
 }
 
 function renderFinancialDashboard(leads) {
+  const activeLeads = leads.filter((l) => l.status !== 'archived')
+
+  let cashReceived = 0
+  let receivables = 0
+
+  const paid100List = []
+  const prepay50List = []
+  const unpaidList = []
+
+  for (const l of activeLeads) {
+    const total = parseAmount(l.budget)
+    if (l.paymentStatus === 'paid_100') {
+      cashReceived += total
+      paid100List.push(l)
+    } else if (l.paymentStatus === 'prepay_50') {
+      const half = Math.round(total / 2)
+      cashReceived += half
+      receivables += (total - half)
+      prepay50List.push(l)
+    } else {
+      if (l.status === 'done') {
+        cashReceived += total
+        paid100List.push(l)
+      } else {
+        receivables += total
+        unpaidList.push(l)
+      }
+    }
+  }
+
   const inWork = leads.filter((l) => l.status === 'in_progress')
   const done = leads.filter((l) => l.status === 'done')
+  const totalPipeline = cashReceived + receivables
 
-  const inWorkSum = inWork.reduce((acc, l) => acc + parseAmount(l.budget), 0)
-  const doneSum = done.reduce((acc, l) => acc + parseAmount(l.budget), 0)
-  const totalPipeline = inWorkSum + doneSum
+  const withBudgetCount = activeLeads.filter((l) => parseAmount(l.budget) > 0).length
+  const avgCheck = withBudgetCount ? Math.round(totalPipeline / withBudgetCount) : 0
 
-  const avgCheck = done.length ? Math.round(doneSum / done.length) : (inWork.length ? Math.round(inWorkSum / inWork.length) : 0)
+  const recentPaid = [...prepay50List, ...paid100List].slice(0, 5)
 
   const text = [
     '💰 <b>Финансовая аналитика Mercury CRM</b>',
     '',
-    `🟢 <b>Фактически заработано (сдано):</b> <b>${formatRubles(doneSum)}</b> (${done.length} сделок)`,
-    `🟡 <b>Пайплайн в работе (ожидается):</b> <b>${formatRubles(inWorkSum)}</b> (${inWork.length} проектов)`,
-    `📊 <b>Общий объём воронки:</b> <b>${formatRubles(totalPipeline)}</b>`,
+    `💵 <b>Получено на руки (авансы + 100%):</b> <b>${formatRubles(cashReceived)}</b>`,
+    `⏳ <b>Ожидается к доплате (остаток):</b> <b>${formatRubles(receivables)}</b>`,
+    `📊 <b>Общий объём пайплайна:</b> <b>${formatRubles(totalPipeline)}</b>`,
     `🎯 <b>Средний чек сделки:</b> <b>${formatRubles(avgCheck)}</b>`,
     '',
-    done.length
-      ? '<b>Последние закрытые сделки:</b>\n' + done.slice(0, 5).map((l) => `• ${esc(l.name)}: <b>${esc(l.budget)}</b>`).join('\n')
-      : '<i>Пока нет завершённых сделок для отчёта.</i>',
+    '💳 <b>Статусы оплат по проектам:</b>',
+    `• ✅ Оплачено 100%: <b>${paid100List.length}</b> проектов`,
+    `• 💳 Аванс 50%: <b>${prepay50List.length}</b> проектов`,
+    `• ⏳ Ожидают оплаты: <b>${unpaidList.length}</b> проектов`,
+    '',
+    recentPaid.length
+      ? '<b>Последние оплаченные проекты:</b>\n' +
+        recentPaid.map((l) => {
+          const badge = l.paymentStatus === 'prepay_50' ? '💳 Аванс 50%' : '✅ 100%'
+          return `• ${esc(l.name)}: <b>${esc(l.budget)}</b> (${badge})`
+        }).join('\n')
+      : '<i>Пока нет проектов с зафиксированной оплатой.</i>',
   ].join('\n')
 
   const reply_markup = {
@@ -508,7 +585,10 @@ function renderSearchResults(leads, query) {
     (l.contact && l.contact.toLowerCase().includes(q)) ||
     (l.task && l.task.toLowerCase().includes(q)) ||
     (l.type && l.type.toLowerCase().includes(q)) ||
-    (l.assignee && l.assignee.toLowerCase().includes(q))
+    (l.assignee && l.assignee.toLowerCase().includes(q)) ||
+    (l.paymentStatus && l.paymentStatus.toLowerCase().includes(q)) ||
+    (q.includes('аванс') && l.paymentStatus === 'prepay_50') ||
+    (q.includes('оплач') && (l.paymentStatus === 'paid_100' || l.paymentStatus === 'prepay_50'))
   )
 
   if (!results.length) {
@@ -619,7 +699,13 @@ export default {
         const chatId = msg?.chat?.id
 
         // МОМЕНТАЛЬНО гасим спиннер на кнопке, чтобы не было задержек в Telegram
-        if (!cqData.startsWith('crm:copy') && !cqData.startsWith('crm:del') && !cqData.startsWith('crm:note') && !cqData.startsWith('crm:assign')) {
+        if (
+          !cqData.startsWith('crm:copy') &&
+          !cqData.startsWith('crm:del') &&
+          !cqData.startsWith('crm:note') &&
+          !cqData.startsWith('crm:assign') &&
+          !cqData.startsWith('crm:pay')
+        ) {
           fetch(`https://api.telegram.org/bot${botToken}/answerCallbackQuery`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -727,7 +813,60 @@ export default {
           return new Response('OK', { headers: cors })
         }
 
-        // 1.5 Добавление заметки к проекту
+        // 1.5 Управление оплатой проекта (Аванс 50% / Оплачен 100% / Сброс)
+        if (cqData.startsWith('crm:pay:')) {
+          const [, , leadId, payVal] = cqData.split(':')
+          let lead = leads.find((l) => l.id === leadId)
+
+          let toastText = '🔄 Статус оплаты сброшен'
+          let noteText = '🔄 Статус оплаты сброшен'
+          let newPayStatus = 'unpaid'
+
+          const budgetNum = lead ? parseAmount(lead.budget) : 0
+          const half = Math.round(budgetNum / 2)
+
+          if (payVal === '50') {
+            newPayStatus = 'prepay_50'
+            toastText = budgetNum > 0 ? `💳 Аванс 50% (${formatRubles(half)}) зафиксирован!` : '💳 Аванс 50% зафиксирован!'
+            noteText = budgetNum > 0 ? `💳 Внесён аванс 50% (${formatRubles(half)})` : '💳 Внесён аванс 50%'
+          } else if (payVal === '100') {
+            newPayStatus = 'paid_100'
+            toastText = budgetNum > 0 ? `✅ Оплата 100% (${formatRubles(budgetNum)}) зафиксирована!` : '✅ Оплата 100% зафиксирована!'
+            noteText = budgetNum > 0 ? `✅ Оплачен полностью 100% (${formatRubles(budgetNum)})` : '✅ Оплачен полностью 100%'
+          }
+
+          await fetch(`https://api.telegram.org/bot${botToken}/answerCallbackQuery`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              callback_query_id: cq.id,
+              text: toastText,
+            }),
+          }).catch(() => {})
+
+          if (lead) {
+            lead.paymentStatus = newPayStatus
+            if (payVal === '50' && lead.status === 'new') {
+              lead.status = 'in_progress'
+            }
+            lead.updatedAt = new Date().toISOString()
+            lead.updatedBy = fromUser
+            lead.notes = lead.notes || []
+            lead.notes.push({
+              text: noteText,
+              author: fromUser,
+              createdAt: new Date().toISOString(),
+            })
+            await saveLeads(env, leads)
+
+            const { text, reply_markup } = renderLeadCard(lead)
+            await safeEditOrSend(botToken, chatId, msg.message_id, text, reply_markup)
+          }
+
+          return new Response('OK', { headers: cors })
+        }
+
+        // 1.6 Добавление заметки к проекту
         if (cqData.startsWith('crm:note:')) {
           const leadId = cqData.split(':')[2]
           const lead = leads.find((l) => l.id === leadId)
@@ -1073,6 +1212,7 @@ export default {
             deadline: 'По графику',
             assignee: fromUser,
             status: 'in_progress',
+            paymentStatus: 'unpaid',
             createdAt: new Date().toISOString(),
             createdBy: fromUser,
           }
@@ -1281,6 +1421,7 @@ export default {
         deadline,
         page,
         status: 'new',
+        paymentStatus: 'unpaid',
         createdAt: new Date().toISOString(),
         createdBy: 'Сайт Mercury',
       }
