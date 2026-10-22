@@ -431,63 +431,22 @@ a{color:inherit}
 /* покачивание — на самом <svg> (это HTML-слой, анимация уходит на видеокарту), а не на <g> внутри: SVG-анимации перерисовываются процессором каждый кадр */
 @keyframes wobble{0%,100%{transform:scale(1,1)}25%{transform:scale(1.04,.96)}50%{transform:scale(.97,1.04) translateY(-1.8%)}75%{transform:scale(1.02,.98)}}
 /* моргание включается классом на ~0.3 с раз в 4.6 с (см. Drop в Mascot.jsx) — в остальное время SVG не трогаем */
-.drop-eyes{transform-box:fill-box;transform-origin:center;transition:transform .2s ease}
+.drop-eyes{transform-box:fill-box;transform-origin:center}
 .drop-svg.blinking .drop-eyes{animation:blink .28s linear}
-.drop-eye{transform:translate(var(--lx,0),var(--ly,0));transition:transform .12s cubic-bezier(.2,1.2,.4,1)}
+.drop-eye{transform:translate(var(--lx,0),var(--ly,0));transition:transform .15s ease-out}
 @keyframes blink{0%,100%{transform:scaleY(1)}33%{transform:scaleY(.1)}}
-
-.drop-blush{transform-box:fill-box;transform-origin:center;transition:opacity .25s ease, transform .25s ease}
-.drop-o{opacity:0;transition:opacity .2s ease, transform .2s ease}
-
-/* Разговор: живая анимация рта и мягкий кивок головы */
-.mood-talk .drop-mouth{opacity:0}
-.mood-talk .drop-o{opacity:1;transform-box:fill-box;transform-origin:center;animation:talkAnim .22s infinite alternate}
-@keyframes talkAnim{0%{transform:scale(1, .3)}100%{transform:scale(1.25, 1.35)}}
-.chat-ava .mood-talk.drop-svg,.mascot.mood-talk .drop-svg{animation:talkHead .38s ease-in-out infinite alternate}
-@keyframes talkHead{0%{transform:translateY(0) rotate(0deg)}50%{transform:translateY(-3px) rotate(2.5deg)}100%{transform:translateY(1.5px) rotate(-2deg)}}
-
-/* Радость: широкая улыбка, прищур глаз, сияющий румянец, праздничный прыжок */
-.mood-happy .drop-mouth{d:path("M42 89 Q50 100 58 89");stroke-width:3px}
-.mood-happy .drop-eyes{transform:translateY(-2px) scaleY(.8)}
-.mood-happy .drop-blush{opacity:.85;transform:scale(1.4)}
-.chat-ava .mood-happy.drop-svg,.mascot.mood-happy .drop-svg{animation:happyWobble 1.1s ease-in-out infinite}
-@keyframes happyWobble{0%,100%{transform:scale(1,1) translateY(0)}25%{transform:scale(1.12,.88) translateY(-5px) rotate(4deg)}50%{transform:scale(.92,1.12) translateY(-10px)}75%{transform:scale(1.06,.94) translateY(-2px) rotate(-3deg)}}
-
-/* Подмигивание: задорный наклон и подмигивание */
-.mood-wink .drop-mouth{d:path("M44 90 Q50 97 56 90");stroke-width:2.8px}
-.mood-wink .drop-eye.eye-r{transform-box:fill-box;transform-origin:center;transform:translate(var(--lx,0),var(--ly,0)) scaleY(.15);transition:transform .18s ease}
-.mood-wink .drop-blush{opacity:.8;transform:scale(1.3)}
-.chat-ava .mood-wink.drop-svg,.mascot.mood-wink .drop-svg{animation:winkTilt .55s ease-in-out}
-@keyframes winkTilt{0%,100%{transform:rotate(0deg)}50%{transform:rotate(-7deg) translateY(-4px)}}
-
-/* Восторг / большой бюджет: распахнутые глаза, яркий румянец, высокий подпрыг */
-.mood-excited .drop-eyes{transform:scale(1.22) translateY(-3px)}
-.mood-excited .drop-mouth{d:path("M42 88 Q50 103 58 88");stroke-width:3.2px}
-.mood-excited .drop-blush{opacity:.95;transform:scale(1.55)}
-.chat-ava .mood-excited.drop-svg,.mascot.mood-excited .drop-svg{animation:happyWobble .85s ease-in-out infinite}
-
-/* Грусть / смущение: опущенный ротик, печальные глазки */
-.mood-sad .drop-mouth{d:path("M45 95 Q50 89 55 95")}
-.mood-sad .drop-eyes{transform:translateY(3px) scale(.9)}
-.mood-sad .drop-blush{opacity:.12}
-
-/* Плавающий маскот на странице */
-.mascot{position:fixed;right:26px;bottom:24px;z-index:40;width:70px;height:78px;padding:0;isolation:isolate;transition:transform .35s cubic-bezier(.2,1.6,.4,1),opacity .3s ease;animation:mascotIn 1s .4s cubic-bezier(.2,1.6,.4,1) both}
+.drop-o{opacity:0}
+.mood-talk .drop-mouth{opacity:0}.mood-talk .drop-o{opacity:1;transform-box:fill-box;transform-origin:center;animation:talk .28s infinite alternate}
+@keyframes talk{to{transform:scaleY(.4)}}
+.mood-happy .drop-mouth{d:path("M43 89 Q50 99 57 89")}
+.mood-sad .drop-mouth{d:path("M45 94 Q50 89 55 94")}
+.mascot{position:fixed;right:26px;bottom:24px;z-index:40;width:70px;height:78px;padding:0;isolation:isolate;transition:transform .45s cubic-bezier(.2,1.6,.4,1),opacity .3s ease;animation:mascotIn 1s .4s cubic-bezier(.2,1.6,.4,1) both}
 @keyframes mascotIn{from{transform:translateY(140%) scale(.4)}}
 .mascot::before,.mascot::after{content:'';position:absolute;z-index:-1;pointer-events:none;border-radius:50%}
 .mascot::before{left:-8%;right:-8%;top:30%;bottom:-26%;background:radial-gradient(closest-side,rgba(0,0,0,.6),rgba(0,0,0,.25) 55%,transparent)}
 .mascot::after{inset:-24%;background:radial-gradient(closest-side,rgba(184,243,255,.16),rgba(184,243,255,.06) 60%,transparent)}
-
-/* Анимация при наведении на маскота: улыбка, живой румянец и всплытие */
-.mascot:hover{transform:scale(1.12) translateY(-6px) rotate(-4deg)}
-.mascot:hover .drop-mouth{d:path("M42 89 Q50 100 58 89");stroke-width:2.8px}
-.mascot:hover .drop-eyes{transform:translateY(-2px) scale(1.1)}
-.mascot:hover .drop-blush{opacity:.85;transform:scale(1.35)}
-.mascot:hover .drop-svg{animation:mascotHoverFloat .7s ease-in-out infinite alternate}
-@keyframes mascotHoverFloat{from{transform:translateY(0)}to{transform:translateY(-5px) scale(1.04)}}
-
-/* Клик / сжатие (squash & stretch) */
-.mascot:active{transform:scale(1.18, .84) translateY(4px);transition:transform .08s ease}
+.mascot:hover{transform:scale(1.1) rotate(-6deg)}
+.mascot:active{transform:scale(.92)}
 .mascot.is-open{transform:scale(1.04);filter:drop-shadow(0 0 16px rgba(184,243,255,.25))}
 .mascot.is-open:hover{transform:scale(1.1) rotate(-4deg)}
 .mascot-dot{position:absolute;right:2px;top:12px;width:16px;height:16px;border-radius:50%;background:#ff5a7a;border:2px solid #060606;animation:pop .4s both}

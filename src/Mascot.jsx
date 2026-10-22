@@ -6,15 +6,6 @@ import { playWaterDrop } from './audio.js'
 
 /* ===== Капля — маскот-ассистент. Собирает бриф и шлёт тебе в Telegram (через M.endpoint) ===== */
 
-const MOUTH_PATHS = {
-  idle: 'M45 91 Q50 96 55 91',
-  talk: 'M45 91 Q50 96 55 91',
-  happy: 'M42 89 Q50 100 58 89',
-  wink: 'M44 90 Q50 97 56 90',
-  sad: 'M45 95 Q50 89 55 95',
-  excited: 'M42 88 Q50 102 58 88',
-}
-
 export function Drop({ mood = 'idle', className = '' }) {
   const id = useId().replace(/[^\w-]/g, '')
   const ref = useRef(null)
@@ -38,13 +29,13 @@ export function Drop({ mood = 'idle', className = '' }) {
       <g className="drop-body">
         <path d="M50 5 C58 22 91 46 91 73 A41 41 0 0 1 9 73 C9 46 42 22 50 5Z" fill={`url(#g${id})`} stroke={`url(#r${id})`} strokeWidth="2.4" />
         <ellipse cx="33" cy="52" rx="7" ry="13" fill="#fff" opacity=".6" transform="rotate(28 33 52)" />
-        <ellipse className="drop-blush blush-l" cx="29" cy="88" rx="7" ry="4" fill="#ff9ad5" opacity=".35" />
-        <ellipse className="drop-blush blush-r" cx="71" cy="88" rx="7" ry="4" fill="#ff9ad5" opacity=".35" />
+        <ellipse cx="29" cy="88" rx="7" ry="4" fill="#ff9ad5" opacity=".35" />
+        <ellipse cx="71" cy="88" rx="7" ry="4" fill="#ff9ad5" opacity=".35" />
         <g className="drop-eyes">
-          <g className="drop-eye eye-l"><ellipse cx="38" cy="76" rx="6.5" ry="8.5" fill="#0d0e10" /><circle cx="40.4" cy="72.6" r="2.4" fill="#fff" /></g>
-          <g className="drop-eye eye-r"><ellipse cx="62" cy="76" rx="6.5" ry="8.5" fill="#0d0e10" /><circle cx="64.4" cy="72.6" r="2.4" fill="#fff" /></g>
+          <g className="drop-eye"><ellipse cx="38" cy="76" rx="6.5" ry="8.5" fill="#0d0e10" /><circle cx="40.4" cy="72.6" r="2.4" fill="#fff" /></g>
+          <g className="drop-eye"><ellipse cx="62" cy="76" rx="6.5" ry="8.5" fill="#0d0e10" /><circle cx="64.4" cy="72.6" r="2.4" fill="#fff" /></g>
         </g>
-        <path className="drop-mouth" d={MOUTH_PATHS[mood] || MOUTH_PATHS.idle} fill="none" stroke="#0d0e10" strokeWidth="2.6" strokeLinecap="round" />
+        <path className="drop-mouth" d="M45 91 Q50 96 55 91" fill="none" stroke="#0d0e10" strokeWidth="2.6" strokeLinecap="round" />
         <ellipse className="drop-o" cx="50" cy="93" rx="3.6" ry="4.2" fill="#0d0e10" />
       </g>
     </svg>
@@ -126,7 +117,6 @@ export default function Mascot({ open, setOpen, prefill, chapterId, onGoWorks })
   const [hint, setHint] = useState(null)
   const [unread, setUnread] = useState(false)
   const [mood, setMood] = useState('idle')
-  const [launcherMood, setLauncherMood] = useState('idle')
   const [soundMuted, setSoundMuted] = useState(() => {
     try {
       return localStorage.getItem('mercury_sound_muted') === 'true'
@@ -207,13 +197,11 @@ export default function Mascot({ open, setOpen, prefill, chapterId, onGoWorks })
     const base = pf?.type ? { type: pf.type, ref: pf.ref } : {}
     setLead(base); leadRef.current = base
     if (pf?.type) {
-      setMood('happy')
       await say(['Привет! Я Капля 💧 Соберу бриф и сразу передам его в Telegram.'])
       setMsgs((m) => [...m, { from: 'me', text: pf.ref ? `Хочу так же, как ${pf.ref}` : `Нужно: ${pf.type}` }])
       setHistory([{ step: 'type', lead: {}, msgsLength: 0 }])
       goStep('task', base)
     } else {
-      setMood('wink')
       goStep('type', base)
     }
   }, [say, goStep])
@@ -221,7 +209,6 @@ export default function Mascot({ open, setOpen, prefill, chapterId, onGoWorks })
   const goBack = useCallback(() => {
     if (!history.length || typing) return
     playWaterDrop('pop', soundMuted)
-    setMood('wink')
     const prev = history[history.length - 1]
     setHistory((h) => h.slice(0, -1))
     setLead(prev.lead)
@@ -238,26 +225,11 @@ export default function Mascot({ open, setOpen, prefill, chapterId, onGoWorks })
     setTimeout(() => setMood('idle'), 600)
   }, [history, typing, goStep])
 
-  // открытие и закрытие панели: микро-эмоции без паразитных перезапусков
+  // открытие панели
   useEffect(() => {
-    const wasOpen = prevOpenRef.current
-    prevOpenRef.current = open
-
-    if (!open) {
-      if (wasOpen && historyRef.current.length > 0 && stepRef.current !== 'after') {
-        setLauncherMood('sad')
-        const t = setTimeout(() => setLauncherMood('idle'), 3500)
-        return () => clearTimeout(t)
-      } else {
-        setLauncherMood('idle')
-      }
-      return
-    }
-
+    if (!open) return
     setHint(null)
     setUnread(false)
-    setLauncherMood('wink')
-    const tWink = setTimeout(() => setLauncherMood('idle'), 1200)
 
     const isNewPrefill = prefill && prefill !== lastPrefillRef.current
     if (!started.current || isNewPrefill) {
@@ -267,7 +239,6 @@ export default function Mascot({ open, setOpen, prefill, chapterId, onGoWorks })
     }
 
     setTimeout(() => inputRef.current?.focus({ preventScroll: true }), 450)
-    return () => clearTimeout(tWink)
   }, [open, prefill, start])
 
   // закрытие по клику вне чата
@@ -289,8 +260,6 @@ export default function Mascot({ open, setOpen, prefill, chapterId, onGoWorks })
       seen.current.add(chapterId)
       setHint(M.hints[chapterId])
       setUnread(true)
-      setLauncherMood('wink')
-      setTimeout(() => setLauncherMood('idle'), 1400)
     }, chapterId === 'home' ? 2600 : 1100)
     const t2 = setTimeout(() => setHint(null), (chapterId === 'home' ? 2600 : 1100) + 5200)
     return () => { clearTimeout(t1); clearTimeout(t2); setHint(null) }
@@ -314,10 +283,9 @@ export default function Mascot({ open, setOpen, prefill, chapterId, onGoWorks })
       if (el) {
         if (!r || !r.width || now - rt > 1000) { r = el.getBoundingClientRect(); rt = now }
         const dx = px - (r.left + r.width / 2), dy = py - (r.top + r.height / 2)
-        const d = Math.hypot(dx, dy) || 1
-        const shift = Math.min(6.5, Math.max(2, (d / 90) * 6.5))
-        el.style.setProperty('--lx', `${(dx / d) * shift}px`)
-        el.style.setProperty('--ly', `${(dy / d) * shift}px`)
+        const d = Math.hypot(dx, dy) || 1, k = Math.min(1, d / 300)
+        el.style.setProperty('--lx', `${(dx / d) * 3.4 * k}px`)
+        el.style.setProperty('--ly', `${(dy / d) * 3 * k}px`)
       }
 
       // Слежение на аватарке в открытом чате
@@ -325,10 +293,9 @@ export default function Mascot({ open, setOpen, prefill, chapterId, onGoWorks })
       if (ava) {
         const ar = ava.getBoundingClientRect()
         const adx = px - (ar.left + ar.width / 2), ady = py - (ar.top + ar.height / 2)
-        const ad = Math.hypot(adx, ady) || 1
-        const ashift = Math.min(6.5, Math.max(2, (ad / 90) * 6.5))
-        ava.style.setProperty('--lx', `${(adx / ad) * ashift}px`)
-        ava.style.setProperty('--ly', `${(ady / ad) * ashift}px`)
+        const ad = Math.hypot(adx, ady) || 1, ak = Math.min(1, ad / 300)
+        ava.style.setProperty('--lx', `${(adx / ad) * 3.4 * ak}px`)
+        ava.style.setProperty('--ly', `${(ady / ad) * 3 * ak}px`)
       }
     }
     const mv = (e) => { px = e.clientX; py = e.clientY; if (!raf) raf = requestAnimationFrame(upd) }
@@ -359,16 +326,10 @@ export default function Mascot({ open, setOpen, prefill, chapterId, onGoWorks })
 
     setHistory((h) => [...h, { step, lead: { ...leadRef.current }, msgsLength: msgs.length }])
 
-    // Заметная анимационная реакция Капли
-    const isBig = step === 'budget' && (v.includes('150 000') || v.includes('120 000') || v.includes('80–150') || v.includes('60–120'))
-    setMood(isBig ? 'excited' : 'happy')
-
+    setMood('happy')
     setMsgs((m) => [...m, { from: 'me', text: v }]); setText('')
     const val = s.field === 'type' ? (TYPE_NAME[v] || v) : v
     const l = { ...leadRef.current, [s.field]: val }; setLead(l); leadRef.current = l
-    
-    // Даём 450мс отчетливо увидеть радость/восторг Капли до начала печатания
-    await sleep(450)
     goStep(s.next, l)
   }
 
@@ -410,12 +371,12 @@ export default function Mascot({ open, setOpen, prefill, chapterId, onGoWorks })
 
   return (
     <>
-      <button ref={launcher} className={`mascot ${open ? 'is-open' : ''} mood-${launcherMood}`} onClick={() => {
+      <button ref={launcher} className={`mascot ${open ? 'is-open' : ''} mood-${mood}`} onClick={() => {
         if (!open) playWaterDrop('bloop', soundMuted)
         setOpen(!open)
       }}
         aria-label={open ? 'Закрыть чат с Каплей' : 'Открыть чат: оставить заявку'} aria-expanded={open} data-cursor={open ? 'закрыть' : 'бриф'}>
-        <Drop mood={open ? 'happy' : launcherMood} />
+        <Drop mood={mood === 'talk' ? 'talk' : (open ? 'happy' : mood)} />
         {unread && !open && <span className="mascot-dot" />}
       </button>
       {hint && !open && (
