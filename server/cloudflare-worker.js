@@ -17,7 +17,9 @@
  * 6. Хранение в Cloudflare KV + безопасный fallback.
  */
 
-const DEFAULT_BOT_TOKEN = '8943025919:AAF8v9ZAxctpJeTu-AAOsg4glTLmNAcBMc4'
+// Токен Telegram-бота: укажи в настройках Cloudflare Worker (Settings -> Variables and Secrets -> TELEGRAM_BOT_TOKEN)
+// либо задай при развёртывании воркера. В открытый GitHub токен не публикуется ради безопасности.
+const DEFAULT_BOT_TOKEN = ''
 const DEFAULT_CHAT_IDS = '1031568361, 1264265361'
 
 const ADMIN_KEYBOARD = {
