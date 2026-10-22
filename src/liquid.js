@@ -12,8 +12,8 @@ const PAD = 0.75 // запас: smin(k=.62) раздувает поле макс
 
 const vert = `attribute vec2 aP; varying vec2 vUv; void main(){ vUv=aP*.5+.5; gl_Position=vec4(aP,0.,1.); }`
 function getFrag(mobile) {
-  const steps = mobile ? 32 : 44
-  const hitEps = mobile ? '0.0016' : '0.0014'
+  const steps = mobile ? 32 : 38
+  const hitEps = mobile ? '0.0016' : '0.0015'
   return `
 precision highp float;
 varying vec2 vUv;
@@ -136,9 +136,6 @@ export class Liquid {
     this.t0 = performance.now(); this.last = this.t0
     this.loop = (now) => { this.raf = requestAnimationFrame(this.loop); this.tick(now) }
     this.paused = 0
-    this._lastWheel = 0
-    this._onWheel = () => { this._lastWheel = performance.now() }
-    window.addEventListener('wheel', this._onWheel, { passive: true })
     this.layout = new SceneLayout(next => { if(next.bounded || this.sceneWasBounded){this.snapScene=true;this.mouse.active=false} this.sceneWasBounded=next.bounded })
     this.start()
     // пауза, когда вкладка скрыта — не жрём батарею
@@ -198,7 +195,7 @@ export class Liquid {
       const maxDim = Math.max(innerWidth, innerHeight) * d
       return maxDim > 1280 ? Math.max(0.85, 1280 / Math.max(innerWidth, innerHeight)) : d
     }
-    const d = Math.min(Math.max(raw, 1), 1.5)
+    const d = Math.min(Math.max(raw, 1), 1.25)
     const maxDim = Math.max(innerWidth, innerHeight) * d
     return maxDim > 1920 ? Math.max(1, 1920 / Math.max(innerWidth, innerHeight)) : d
   }
@@ -218,7 +215,7 @@ export class Liquid {
      без билинейного размытия и алиасинга шрифтов). */
   posterScale() {
     const raw = devicePixelRatio || 1
-    return Math.min(raw, this.mobile ? 1.25 : 1.5)
+    return Math.min(raw, this.mobile ? 1.15 : 1.25)
   }
   canvasFor() {
     const c = this.pool.pop() || document.createElement('canvas')
@@ -228,14 +225,17 @@ export class Liquid {
   }
   release(c) { if (c && this.pool.length < 1) this.pool.push(c) }
   posterCanvas(fn) {
-    const c = this.cache.get(fn)
-    if (c) { this.cache.delete(fn); return c }
-    const n = this.canvasFor(); this.paint(n, fn); return n
+    let c = this.cache.get(fn)
+    if (!c) {
+      c = this.canvasFor()
+      this.paint(c, fn)
+      this.cache.set(fn, c)
+    }
+    return c
   }
   // App сообщает соседние главы — дорисуем их, когда браузер будет свободен
   prefetch(fns) {
     this.want = fns.filter(Boolean)
-    for (const [fn, c] of this.cache) if (!this.want.includes(fn)) { this.cache.delete(fn); this.release(c) }
     this.schedule()
   }
   schedule() {
@@ -272,7 +272,7 @@ export class Liquid {
     fn(ctx, c.width, c.height, this.mobile)
   }
   setPoster(fn) {
-    if (this.draw && this.draw !== fn) { this.cache.set(this.draw, this.cA) } else this.release(this.cA)
+    
     this.layout?.setChapter(this.chapter)
     this.draw = fn; this.cA = this.posterCanvas(fn); this.upload(0, this.cA)
   }
@@ -288,7 +288,7 @@ export class Liquid {
   finish() {
     const t = this.trans; if (!t) return
     // старый постер не выбрасываем: это сосед новой главы, пригодится при листании назад
-    if (this.draw && this.draw !== t.draw) this.cache.set(this.draw, this.cA); else this.release(this.cA)
+    
     this.cA = this.cB; this.cB = null
     if (this.gl) {
       ;[this.tex[0], this.tex[1]] = [this.tex[1], this.tex[0]]
@@ -406,11 +406,6 @@ export class Liquid {
   }
   tick(now) {
     const gl = this.gl; if (!gl) return
-    const scrolling = now - (this._lastWheel || 0) < 120
-    if (scrolling && !this.mobile && !this.trans) {
-      this._scrollSkip = !this._scrollSkip
-      if (this._scrollSkip) return
-    }
     const raw = (now - this.last) / 1000, dt = Math.min(0.05, raw); this.last = now
     const t = this.reduce ? 3 : (now - this.t0) / 1000
     this.govern(Math.min(0.25, raw), now)
@@ -461,7 +456,7 @@ export class Liquid {
     gl.drawArrays(gl.TRIANGLES, 0, 3)
   }
   destroy() {
-    this.layout?.destroy(); this.stop(); clearTimeout(this.idleId); window.cancelIdleCallback?.(this.idleId); document.removeEventListener('visibilitychange', this.onVis); removeEventListener('resize', this.onResize); window.removeEventListener('wheel', this._onWheel)
+    this.layout?.destroy(); this.stop(); clearTimeout(this.idleId); window.cancelIdleCallback?.(this.idleId); document.removeEventListener('visibilitychange', this.onVis); removeEventListener('resize', this.onResize)
     this.canvas.removeEventListener('webglcontextlost', this.onLost); this.canvas.removeEventListener('webglcontextrestored', this.onRestored)
     this.gl?.getExtension('WEBGL_lose_context')?.loseContext(); this.el.innerHTML = ''
   }

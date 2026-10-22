@@ -100,7 +100,7 @@ export default function App() {
     if (/[?&]debug\b/.test(location.search)) window.__stage = st // для проверки: __stage.quality, __stage.onSlow()
     document.documentElement.classList.toggle('static-mode', !!st.fallback)
     st.onSlow = () => { if (!sessionStorage.getItem('vg-slow')) setSlowAsk(true) }
-    st.chapter = IDS[chRef.current]; st.setPoster(posters[chRef.current]); st.prefetch?.([posters[chRef.current + 1], posters[chRef.current - 1]])
+    st.chapter = IDS[chRef.current]; st.setPoster(posters[chRef.current]); st.prefetch?.(posters)
   }
   const toggleFx = async (on = !fx) => {
     if (fxBusy.current || !liquid.current || (on && !canGL)) return
@@ -133,9 +133,9 @@ export default function App() {
   useEffect(() => {
     const l = liquid.current; if (!l?.pause) return
     // на телефоне чат-бриф раскрывается на весь экран — там ртуть тоже не видна
-    const covered = openCase || (chat.open && isMobile())
+    const covered = openCase || calcOpen || (chat.open && isMobile())
     if (!covered) { l.resume(); return }
-    const pauseDelay = isMobile() ? (openCase ? 120 : 250) : (openCase ? 140 : 350)
+    const pauseDelay = isMobile() ? (openCase || calcOpen ? 120 : 250) : (openCase || calcOpen ? 140 : 350)
     const t = setTimeout(() => l.pause(), pauseDelay)
     return () => clearTimeout(t)
   }, [openCase, chat.open, ready, fx])
@@ -504,6 +504,7 @@ function Works({ onOpen, covered }) {
 
     const startGlide = () => {
       if (smoothRaf) return
+      el.classList.add('is-gliding')
       const glide = () => {
         const maxScroll = el.scrollWidth - el.clientWidth
         targetX = Math.max(0, Math.min(maxScroll, targetX))
@@ -527,6 +528,7 @@ function Works({ onOpen, covered }) {
             v = 0
             updateVisuals(0)
             smoothRaf = 0
+            el.classList.remove('is-gliding')
           }
         }
       }
@@ -555,6 +557,7 @@ function Works({ onOpen, covered }) {
     let down = null, trackX = 0, trackT = 0, dragVel = 0
     const pd = (e) => {
       if (e.pointerType !== 'mouse') return
+      el.classList.add('is-gliding')
       cancelAnimationFrame(smoothRaf)
       smoothRaf = 0
       currentX = el.scrollLeft
@@ -945,9 +948,9 @@ function Cursor({ hidden }) {
   useEffect(() => {
     let x = -100, y = -100, cx = x, cy = y, raf = 0, pendingTarget = null
     const loop = () => {
-      cx += (x - cx) * 0.25; cy += (y - cy) * 0.25
+      cx += (x - cx) * 0.35; cy += (y - cy) * 0.35
       if (Math.abs(x - cx) < 0.1 && Math.abs(y - cy) < 0.1 && !pendingTarget) { cx = x; cy = y; raf = 0 } else raf = requestAnimationFrame(loop)
-      if (ref.current) ref.current.style.transform = `translate(${cx}px,${cy}px)`
+      if (ref.current) ref.current.style.transform = `translate3d(${cx}px,${cy}px,0)`
       if (pendingTarget) {
         updateTarget(pendingTarget)
         pendingTarget = null

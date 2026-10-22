@@ -39,7 +39,7 @@ class LiteStage {
     this.layout = new SceneLayout(() => this.place())
     this.place()
   }
-  scale() { return Math.min(Math.max(devicePixelRatio || 1, 1.5), 2) }
+  scale() { return Math.min(devicePixelRatio || 1, 1.25) }
   canvasFor(fn) {
     let c = this.cache.get(fn)
     if (!c) {
@@ -54,7 +54,7 @@ class LiteStage {
     if (c === old) return
     this.cur = c; this.wrap.appendChild(c)
     // держим в кеше только текущий постер и соседей (prefetch); остальные выкидываем
-    for (const [k, v] of this.cache) if (v !== c && v !== old && !this.keep?.includes(k)) this.cache.delete(k)
+    // keep cached in memory for instant chapter flips
     if (instant || !old) { old?.remove(); return }
     c.animate([{ opacity: 0, transform: 'scale(1.04)' }, { opacity: 1, transform: 'none' }], { duration: 520, easing: 'cubic-bezier(.2,.8,.3,1)' })
       .onfinish = () => { if (this.cur !== old) old.remove() }
