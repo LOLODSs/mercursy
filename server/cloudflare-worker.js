@@ -106,6 +106,133 @@ function statusBadge(status) {
   }
 }
 
+// =============================================================
+// ЭКСПОРТ БАЗЫ ЛИДОВ В .CSV ДЛЯ EXCEL И GOOGLE ТАБЛИЦ
+// =============================================================
+function escapeCsv(val) {
+  if (val === null || val === undefined) return '""'
+  const s = String(val).replace(/"/g, '""').replace(/[\r\n]+/g, ' ')
+  return `"${s}"`
+}
+
+function generateLeadsCsv(leads) {
+  const headers = [
+    'ID',
+    'Дата',
+    'Клиент',
+    'Контакт',
+    'Тип проекта',
+    'Бюджет (текст)',
+    'Бюджет (₽)',
+    'Статус проекта',
+    'Статус оплаты',
+    'Получено (₽)',
+    'Остаток к доплате (₽)',
+    'Ответственный',
+    'Сроки',
+    'Задача',
+    'Заметки',
+  ]
+
+  const rows = [headers.join(';')]
+
+  for (const l of leads) {
+    const total = parseAmount(l.budget)
+    let payStatusStr = 'Ожидает оплаты'
+    let paid = 0
+    let unpaid = total
+
+    if (l.paymentStatus === 'paid_100') {
+      payStatusStr = 'Оплачен 100%'
+      paid = total
+      unpaid = 0
+    } else if (l.paymentStatus === 'prepay_50') {
+      payStatusStr = 'Аванс 50%'
+      paid = Math.round(total / 2)
+      unpaid = total - paid
+    } else if (l.status === 'done') {
+      payStatusStr = 'Сдан (закрыт)'
+      paid = total
+      unpaid = 0
+    }
+
+    let projectStatusStr = 'Новый'
+    if (l.status === 'in_progress') projectStatusStr = 'В работе'
+    else if (l.status === 'done') projectStatusStr = 'Сдан'
+    else if (l.status === 'archived') projectStatusStr = 'В архиве'
+
+    const notesSummary = (l.notes || []).map((n) => `[${formatDate(n.createdAt)} ${n.author}]: ${n.text}`).join(' | ')
+
+    const row = [
+      escapeCsv(l.id),
+      escapeCsv(formatDate(l.createdAt)),
+      escapeCsv(l.name),
+      escapeCsv(l.contact),
+      escapeCsv(l.type || 'Проект'),
+      escapeCsv(l.budget || 'По договорённости'),
+      escapeCsv(total),
+      escapeCsv(projectStatusStr),
+      escapeCsv(payStatusStr),
+      escapeCsv(paid),
+      escapeCsv(unpaid),
+      escapeCsv(l.assignee || 'Не назначен'),
+      escapeCsv(l.deadline || 'По графику'),
+      escapeCsv(l.task || ''),
+      escapeCsv(notesSummary),
+    ]
+
+    rows.push(row.join(';'))
+  }
+
+  return rows.join('\r\n')
+}
+
+async function sendLeadsCsvDocument(botToken, chatId, leads) {
+  if (!leads || !leads.length) {
+    await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: '⚠️ <b>База пуста!</b> В CRM пока нет сделок для выгрузки.',
+        parse_mode: 'HTML',
+      }),
+    })
+    return
+  }
+
+  const csvBody = '\uFEFF' + generateLeadsCsv(leads)
+  const blob = new Blob([csvBody], { type: 'text/csv;charset=utf-8;' })
+  const today = new Date().toISOString().slice(0, 10)
+  const filename = `mercury_leads_${today}.csv`
+
+  const inWorkCount = leads.filter((l) => l.status === 'in_progress').length
+  const doneCount = leads.filter((l) => l.status === 'done').length
+  const totalPipeline = leads.reduce((acc, l) => acc + parseAmount(l.budget), 0)
+
+  const caption = [
+    '📥 <b>Выгрузка базы Mercury CRM (.CSV)</b>',
+    '',
+    `📁 Всего проектов: <b>${leads.length}</b>`,
+    `🟡 В работе: <b>${inWorkCount}</b> | 🟢 Сдано: <b>${doneCount}</b>`,
+    `📊 Общий объём базы: <b>${formatRubles(totalPipeline)}</b>`,
+    `📅 Сформировано: <i>${formatDate(new Date())}</i>`,
+    '',
+    '<i>Файл готов для открытия в Excel, Google Таблицах или Numbers.</i>',
+  ].join('\n')
+
+  const formData = new FormData()
+  formData.append('chat_id', chatId)
+  formData.append('caption', caption)
+  formData.append('parse_mode', 'HTML')
+  formData.append('document', blob, filename)
+
+  await fetch(`https://api.telegram.org/bot${botToken}/sendDocument`, {
+    method: 'POST',
+    body: formData,
+  })
+}
+
 // Автоматический парсер сделки из сообщения
 function parseLeadFromMessage(rawText, messageId) {
   if (!rawText) return null
@@ -313,7 +440,8 @@ function renderAdminDashboard(leads, hasKV) {
         { text: '💰 Финансы', callback_data: 'crm:finances' },
       ],
       [
-        { text: '🔍 Поиск по базе', callback_data: 'crm:search' },
+        { text: '🔍 Поиск', callback_data: 'crm:search' },
+        { text: '📥 Скачать базу (.csv)', callback_data: 'crm:export' },
       ],
     ],
   }
@@ -551,7 +679,10 @@ function renderFinancialDashboard(leads) {
         { text: `🟡 В работе (${inWork.length})`, callback_data: 'crm:list:in_progress' },
         { text: `🟢 Сданные (${done.length})`, callback_data: 'crm:list:done' },
       ],
-      [{ text: '🔙 В главное меню', callback_data: 'crm:home' }],
+      [
+        { text: '📥 Скачать базу (.csv)', callback_data: 'crm:export' },
+        { text: '🔙 В главное меню', callback_data: 'crm:home' },
+      ],
     ],
   }
 
@@ -684,7 +815,8 @@ export default {
           !cqData.startsWith('crm:del') &&
           !cqData.startsWith('crm:note') &&
           !cqData.startsWith('crm:assign') &&
-          !cqData.startsWith('crm:pay')
+          !cqData.startsWith('crm:pay') &&
+          !cqData.startsWith('crm:export')
         ) {
           fetch(`https://api.telegram.org/bot${botToken}/answerCallbackQuery`, {
             method: 'POST',
@@ -1082,6 +1214,21 @@ export default {
           return new Response('OK', { headers: cors })
         }
 
+        // 1.13 Выгрузка базы лидов в .CSV
+        if (cqData === 'crm:export') {
+          await fetch(`https://api.telegram.org/bot${botToken}/answerCallbackQuery`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              callback_query_id: cq.id,
+              text: '📥 Формирую файл таблицы...',
+            }),
+          }).catch(() => {})
+
+          await sendLeadsCsvDocument(botToken, chatId, leads)
+          return new Response('OK', { headers: cors })
+        }
+
         // 1.13 Отмена действия
         if (cqData === 'crm:cancel') {
           await setAdminState(env, chatId, null)
@@ -1364,6 +1511,12 @@ export default {
               },
             }),
           })
+          return new Response('OK', { headers: cors })
+        }
+
+        if (t.includes('Скачать') || t.includes('Экспорт') || t.includes('экспорт') || t.toLowerCase() === '/export' || t.toLowerCase() === '/csv') {
+          await setAdminState(env, fromChatId, null)
+          await sendLeadsCsvDocument(botToken, fromChatId, leads)
           return new Response('OK', { headers: cors })
         }
       }
