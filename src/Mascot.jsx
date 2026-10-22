@@ -273,7 +273,7 @@ export default function Mascot({ open, setOpen, prefill, chapterId, onGoWorks })
       return
     }
     // не чаще раза за кадр; позицию капли кешируем (сбрасываем на ресайз), чтобы не дёргать layout
-    let r = null, rt = 0, raf = 0, px = 0, py = 0
+    let r = null, rt = 0, ar = null, art = 0, raf = 0, px = 0, py = 0
     const upd = () => {
       raf = 0
       const now = performance.now()
@@ -291,7 +291,7 @@ export default function Mascot({ open, setOpen, prefill, chapterId, onGoWorks })
       // Слежение на аватарке в открытом чате
       const ava = avaRef.current
       if (ava) {
-        const ar = ava.getBoundingClientRect()
+        if (!ar || !ar.width || now - art > 1000) { ar = ava.getBoundingClientRect(); art = now }
         const adx = px - (ar.left + ar.width / 2), ady = py - (ar.top + ar.height / 2)
         const ad = Math.hypot(adx, ady) || 1, ak = Math.min(1, ad / 300)
         ava.style.setProperty('--lx', `${(adx / ad) * 3.4 * ak}px`)
@@ -299,7 +299,7 @@ export default function Mascot({ open, setOpen, prefill, chapterId, onGoWorks })
       }
     }
     const mv = (e) => { px = e.clientX; py = e.clientY; if (!raf) raf = requestAnimationFrame(upd) }
-    const rs = () => { r = null }
+    const rs = () => { r = null; ar = null }
     addEventListener('pointermove', mv); addEventListener('resize', rs)
     return () => { removeEventListener('pointermove', mv); removeEventListener('resize', rs); cancelAnimationFrame(raf) }
   }, [])

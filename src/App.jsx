@@ -135,7 +135,7 @@ export default function App() {
     // на телефоне чат-бриф раскрывается на весь экран — там ртуть тоже не видна
     const covered = openCase || (chat.open && isMobile())
     if (!covered) { l.resume(); return }
-    const pauseDelay = isMobile() ? (openCase ? 160 : 250) : (openCase ? 1100 : 500)
+    const pauseDelay = isMobile() ? (openCase ? 120 : 250) : (openCase ? 140 : 350)
     const t = setTimeout(() => l.pause(), pauseDelay)
     return () => clearTimeout(t)
   }, [openCase, chat.open, ready, fx])
@@ -432,28 +432,34 @@ function Works({ onOpen, covered }) {
     const el = reel.current
     if (!el) return
     let raf = 0
+    let cardCenters = []
+    const cacheCenters = () => {
+      const cards = el.querySelectorAll('.card')
+      cardCenters = Array.from(cards).map(c => c.offsetLeft + c.offsetWidth / 2)
+    }
+    cacheCenters()
     const onScrollActive = () => {
       if (raf) return
       raf = requestAnimationFrame(() => {
         raf = 0
-        const cards = el.querySelectorAll('.card')
-        if (!cards.length) return
+        if (!cardCenters.length) cacheCenters()
         const scrollCenter = el.scrollLeft + el.clientWidth / 2
         let closest = 0, minDist = Infinity
-        cards.forEach((c, idx) => {
-          const center = c.offsetLeft + c.offsetWidth / 2
-          const dist = Math.abs(scrollCenter - center)
+        for (let i = 0; i < cardCenters.length; i++) {
+          const dist = Math.abs(scrollCenter - cardCenters[i])
           if (dist < minDist) {
             minDist = dist
-            closest = idx
+            closest = i
           }
-        })
+        }
         setActiveIdx((prev) => (prev === closest ? prev : closest))
       })
     }
     el.addEventListener('scroll', onScrollActive, { passive: true })
+    window.addEventListener('resize', cacheCenters, { passive: true })
     return () => {
       el.removeEventListener('scroll', onScrollActive)
+      window.removeEventListener('resize', cacheCenters)
       cancelAnimationFrame(raf)
     }
   }, [])
@@ -469,13 +475,24 @@ function Works({ onOpen, covered }) {
 
     const updateVisuals = (velocity) => {
       if (isMobile()) return
+      if (Math.abs(velocity) < 0.08) {
+        if (lastRotY !== 0 || lastScale !== 1 || lastShift !== 0) {
+          lastRotY = 0; lastScale = 1; lastShift = 0
+          el.style.setProperty('--rot-y', '0deg')
+          el.style.setProperty('--rot-z', '0deg')
+          el.style.setProperty('--card-scale', '1')
+          el.style.setProperty('--media-shift', '0px')
+          el.style.setProperty('--lift-y', '0px')
+        }
+        return
+      }
       const rotY = Math.round(Math.max(-13, Math.min(13, -velocity * 0.35)) * 10) / 10
       const rotZ = Math.round(Math.max(-2, Math.min(2, -velocity * 0.05)) * 10) / 10
       const scale = Math.round(Math.max(0.96, 1 - Math.min(0.04, Math.abs(velocity) * 0.0014)) * 1000) / 1000
       const shift = Math.round(Math.max(-16, Math.min(16, velocity * 0.42)) * 10) / 10
       const lift = Math.round(Math.min(6, Math.abs(velocity) * 0.1) * 10) / 10
 
-      if (rotY !== lastRotY || scale !== lastScale || shift !== lastShift) {
+      if (Math.abs(rotY - lastRotY) >= 0.2 || Math.abs(scale - lastScale) >= 0.002 || Math.abs(shift - lastShift) >= 0.5) {
         lastRotY = rotY; lastScale = scale; lastShift = shift
         el.style.setProperty('--rot-y', `${rotY}deg`)
         el.style.setProperty('--rot-z', `${rotZ}deg`)
@@ -926,11 +943,15 @@ function Cursor({ hidden }) {
   }, [hidden])
 
   useEffect(() => {
-    let x = -100, y = -100, cx = x, cy = y, raf = 0
+    let x = -100, y = -100, cx = x, cy = y, raf = 0, pendingTarget = null
     const loop = () => {
       cx += (x - cx) * 0.25; cy += (y - cy) * 0.25
-      if (Math.abs(x - cx) < 0.1 && Math.abs(y - cy) < 0.1) { cx = x; cy = y; raf = 0 } else raf = requestAnimationFrame(loop)
+      if (Math.abs(x - cx) < 0.1 && Math.abs(y - cy) < 0.1 && !pendingTarget) { cx = x; cy = y; raf = 0 } else raf = requestAnimationFrame(loop)
       if (ref.current) ref.current.style.transform = `translate(${cx}px,${cy}px)`
+      if (pendingTarget) {
+        updateTarget(pendingTarget)
+        pendingTarget = null
+      }
     }
     const updateTarget = (el) => {
       if (!el) return
@@ -954,8 +975,8 @@ function Cursor({ hidden }) {
     const mv = (e) => {
       if (e.pointerType !== 'mouse') return
       x = e.clientX; y = e.clientY
+      pendingTarget = e.target
       if (!raf) raf = requestAnimationFrame(loop)
-      updateTarget(e.target)
     }
 
     const refresh = () => {

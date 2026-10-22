@@ -136,6 +136,9 @@ export class Liquid {
     this.t0 = performance.now(); this.last = this.t0
     this.loop = (now) => { this.raf = requestAnimationFrame(this.loop); this.tick(now) }
     this.paused = 0
+    this._lastWheel = 0
+    this._onWheel = () => { this._lastWheel = performance.now() }
+    window.addEventListener('wheel', this._onWheel, { passive: true })
     this.layout = new SceneLayout(next => { if(next.bounded || this.sceneWasBounded){this.snapScene=true;this.mouse.active=false} this.sceneWasBounded=next.bounded })
     this.start()
     // пауза, когда вкладка скрыта — не жрём батарею
@@ -403,6 +406,11 @@ export class Liquid {
   }
   tick(now) {
     const gl = this.gl; if (!gl) return
+    const scrolling = now - (this._lastWheel || 0) < 120
+    if (scrolling && !this.mobile && !this.trans) {
+      this._scrollSkip = !this._scrollSkip
+      if (this._scrollSkip) return
+    }
     const raw = (now - this.last) / 1000, dt = Math.min(0.05, raw); this.last = now
     const t = this.reduce ? 3 : (now - this.t0) / 1000
     this.govern(Math.min(0.25, raw), now)
@@ -453,7 +461,7 @@ export class Liquid {
     gl.drawArrays(gl.TRIANGLES, 0, 3)
   }
   destroy() {
-    this.layout?.destroy(); this.stop(); clearTimeout(this.idleId); window.cancelIdleCallback?.(this.idleId); document.removeEventListener('visibilitychange', this.onVis); removeEventListener('resize', this.onResize)
+    this.layout?.destroy(); this.stop(); clearTimeout(this.idleId); window.cancelIdleCallback?.(this.idleId); document.removeEventListener('visibilitychange', this.onVis); removeEventListener('resize', this.onResize); window.removeEventListener('wheel', this._onWheel)
     this.canvas.removeEventListener('webglcontextlost', this.onLost); this.canvas.removeEventListener('webglcontextrestored', this.onRestored)
     this.gl?.getExtension('WEBGL_lose_context')?.loseContext(); this.el.innerHTML = ''
   }
