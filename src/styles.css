@@ -571,7 +571,7 @@ a{color:inherit}
 .flow-svg{display:block}
 .chat-body{min-height:0;overflow-wrap:anywhere}
 .chat-head>div{min-width:0}
-.chat-head b{overflow-wrap:anywhere}
+.chat-head b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .chat-head,.chat-input{flex-shrink:0}
 .static-mode .touch-hint{display:none}
 .has-cursor .chat,.has-cursor .chat *,.has-cursor .case,.has-cursor .case *{cursor:auto}

@@ -437,9 +437,9 @@ export default function Mascot({ open, setOpen, prefill, chapterId, onGoWorks })
             </button>
           )}
           <span className="chat-ava" ref={avaRef}><Drop mood={mood} /></span>
-          <div className="chat-head-info">
-            <b>{M.name} · ассистент {profile.name}</b>
-            <small><i />{typing ? 'печатает…' : 'онлайн · ответ в течение дня'}</small>
+          <div className="chat-head-info" title={`${M.name} · ассистент ${profile.name}`}>
+            <b>{M.name}</b>
+            <small><i />{typing ? 'печатает…' : 'онлайн'}</small>
           </div>
           <div className="chat-head-actions">
             <button
