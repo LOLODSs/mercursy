@@ -10,6 +10,8 @@
     <title>mercury — живые сайты, Telegram-боты и автоматизации n8n</title>
     <meta name="description" content="Портфолио mercury: сайты с 3D и анимацией, Telegram-боты для продаж и записи, автоматизации на n8n с AI. Бриф за минуту, ответ в течение дня." />
     <link rel="canonical" href="https://lolodss.github.io/mercursy/" />
+
+    <!-- OpenGraph & Social Cards -->
     <meta property="og:type" content="website" />
     <meta property="og:locale" content="ru_RU" />
     <meta property="og:site_name" content="mercury" />
@@ -27,7 +29,113 @@
     <meta name="twitter:title" content="mercury — живые сайты, Telegram-боты и автоматизации n8n" />
     <meta name="twitter:description" content="Сайты с 3D и жидким хромом, Telegram-боты под ключ и AI-автоматизации на n8n. Делаю живое." />
     <meta name="twitter:image" content="https://lolodss.github.io/mercursy/og.png" />
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><defs><radialGradient id='g' cx='.35' cy='.3'><stop offset='0' stop-color='%23fff'/><stop offset='.5' stop-color='%23b9c7d6'/><stop offset='1' stop-color='%23222'/></radialGradient></defs><circle cx='16' cy='16' r='13' fill='url(%23g)'/></svg>" />
+
+    <!-- Favicons & Touch Icons -->
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png" />
+    <link rel="icon" type="image/png" sizes="512x512" href="./icon-512.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png" />
+
+    <!-- WebApp & PWA Manifest -->
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <meta name="application-name" content="mercury" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="mercury" />
+    <meta name="format-detection" content="telephone=no" />
+    <meta name="mobile-web-app-capable" content="yes" />
+
+    <!-- Schema.org Structured Data (JSON-LD) -->
+    <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebSite",
+      "@id": "https://lolodss.github.io/mercursy/#website",
+      "url": "https://lolodss.github.io/mercursy/",
+      "name": "mercury — digital studio",
+      "description": "Сайты с 3D и жидким хромом, Telegram-боты под ключ и AI-автоматизации на n8n.",
+      "inLanguage": "ru-RU"
+    },
+    {
+      "@type": "ProfessionalService",
+      "@id": "https://lolodss.github.io/mercursy/#organization",
+      "name": "mercury digital studio",
+      "alternateName": "mercury",
+      "url": "https://lolodss.github.io/mercursy/",
+      "logo": "https://lolodss.github.io/mercursy/icon-512.png",
+      "image": "https://lolodss.github.io/mercursy/og.png",
+      "description": "Разработка сайтов с 3D и анимацией на Three.js/WebGL, Telegram-ботов для бизнеса и автоматизаций процессов на n8n.",
+      "priceRange": "25000 - 150000 RUB",
+      "currenciesAccepted": "RUB",
+      "paymentAccepted": "Банковский перевод, безналичный расчёт, СБП",
+      "areaServed": [
+        {
+          "@type": "Country",
+          "name": "RU"
+        },
+        {
+          "@type": "AdministrativeArea",
+          "name": "Worldwide"
+        }
+      ],
+      "founder": {
+        "@type": "Person",
+        "name": "mercury",
+        "jobTitle": "Creative Developer & Automation Engineer",
+        "url": "https://t.me/Xitinchik",
+        "sameAs": [
+          "https://t.me/Xitinchik",
+          "https://vk.com/blagamix",
+          "https://github.com/LOLODSs"
+        ]
+      },
+      "sameAs": [
+        "https://t.me/Xitinchik",
+        "https://vk.com/blagamix",
+        "https://github.com/LOLODSs"
+      ],
+      "hasOfferCatalog": {
+        "@type": "OfferCatalog",
+        "name": "Услуги цифровой студии mercury",
+        "itemListElement": [
+          {
+            "@type": "Offer",
+            "itemOffered": {
+              "@type": "Service",
+              "name": "Сайты и лендинги с 3D и анимацией",
+              "description": "Разработка интерактивных сайтов на Three.js, React, WebGL с кинетической типографикой и 60 FPS."
+            },
+            "price": "60000",
+            "priceCurrency": "RUB"
+          },
+          {
+            "@type": "Offer",
+            "itemOffered": {
+              "@type": "Service",
+              "name": "Telegram-боты под ключ",
+              "description": "Боты для продаж, онлайн-записи клиентов, приёма платежей и AI-ассистенты."
+            },
+            "price": "35000",
+            "priceCurrency": "RUB"
+          },
+          {
+            "@type": "Offer",
+            "itemOffered": {
+              "@type": "Service",
+              "name": "Автоматизации на n8n",
+              "description": "Интеграция CRM, сквозная обработка лидов, AI-классификация и автоматизация рутины."
+            },
+            "price": "25000",
+            "priceCurrency": "RUB"
+          }
+        ]
+      }
+    }
+  ]
+}
+    </script>
   </head>
   <body>
     <div id="root"></div>
