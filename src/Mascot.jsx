@@ -5,6 +5,15 @@ import { isMobile } from './mq.js'
 
 /* ===== Капля — маскот-ассистент. Собирает бриф и шлёт тебе в Telegram (через M.endpoint) ===== */
 
+const MOUTH_PATHS = {
+  idle: 'M45 91 Q50 96 55 91',
+  talk: 'M45 91 Q50 96 55 91',
+  happy: 'M42 89 Q50 100 58 89',
+  wink: 'M44 90 Q50 97 56 90',
+  sad: 'M45 95 Q50 89 55 95',
+  excited: 'M42 88 Q50 102 58 88',
+}
+
 export function Drop({ mood = 'idle', className = '' }) {
   const id = useId().replace(/[^\w-]/g, '')
   const ref = useRef(null)
@@ -28,13 +37,13 @@ export function Drop({ mood = 'idle', className = '' }) {
       <g className="drop-body">
         <path d="M50 5 C58 22 91 46 91 73 A41 41 0 0 1 9 73 C9 46 42 22 50 5Z" fill={`url(#g${id})`} stroke={`url(#r${id})`} strokeWidth="2.4" />
         <ellipse cx="33" cy="52" rx="7" ry="13" fill="#fff" opacity=".6" transform="rotate(28 33 52)" />
-        <ellipse cx="29" cy="88" rx="7" ry="4" fill="#ff9ad5" opacity=".35" />
-        <ellipse cx="71" cy="88" rx="7" ry="4" fill="#ff9ad5" opacity=".35" />
+        <ellipse className="drop-blush blush-l" cx="29" cy="88" rx="7" ry="4" fill="#ff9ad5" opacity=".35" />
+        <ellipse className="drop-blush blush-r" cx="71" cy="88" rx="7" ry="4" fill="#ff9ad5" opacity=".35" />
         <g className="drop-eyes">
-          <g className="drop-eye"><ellipse cx="38" cy="76" rx="6.5" ry="8.5" fill="#0d0e10" /><circle cx="40.4" cy="72.6" r="2.4" fill="#fff" /></g>
-          <g className="drop-eye"><ellipse cx="62" cy="76" rx="6.5" ry="8.5" fill="#0d0e10" /><circle cx="64.4" cy="72.6" r="2.4" fill="#fff" /></g>
+          <g className="drop-eye eye-l"><ellipse cx="38" cy="76" rx="6.5" ry="8.5" fill="#0d0e10" /><circle cx="40.4" cy="72.6" r="2.4" fill="#fff" /></g>
+          <g className="drop-eye eye-r"><ellipse cx="62" cy="76" rx="6.5" ry="8.5" fill="#0d0e10" /><circle cx="64.4" cy="72.6" r="2.4" fill="#fff" /></g>
         </g>
-        <path className="drop-mouth" d="M45 91 Q50 96 55 91" fill="none" stroke="#0d0e10" strokeWidth="2.6" strokeLinecap="round" />
+        <path className="drop-mouth" d={MOUTH_PATHS[mood] || MOUTH_PATHS.idle} fill="none" stroke="#0d0e10" strokeWidth="2.6" strokeLinecap="round" />
         <ellipse className="drop-o" cx="50" cy="93" rx="3.6" ry="4.2" fill="#0d0e10" />
       </g>
     </svg>
@@ -77,6 +86,7 @@ export default function Mascot({ open, setOpen, prefill, chapterId, onGoWorks })
   const [hint, setHint] = useState(null)
   const [unread, setUnread] = useState(false)
   const [mood, setMood] = useState('idle')
+  const [launcherMood, setLauncherMood] = useState('idle')
   const [sent, setSent] = useState(null)
   const [history, setHistory] = useState([])
   const started = useRef(false), seen = useRef(new Set()), body = useRef(null), panel = useRef(null), launcher = useRef(null), hp = useRef(null), inputRef = useRef(null)
@@ -84,17 +94,17 @@ export default function Mascot({ open, setOpen, prefill, chapterId, onGoWorks })
 
   useFocusTrap(panel, open, () => setOpen(false), { trap: isMobile() })
 
-  const say = useCallback(async (lines) => {
+  const say = useCallback(async (lines, finishMood = 'idle') => {
     setMood('talk')
     for (const t of lines) {
       setTyping(true); await sleep(380 + Math.min(900, t.length * 9)); setTyping(false)
       setMsgs((m) => [...m, { from: 'bot', ...(typeof t === 'string' ? { text: t } : t) }]); await sleep(120)
     }
-    setMood('idle')
+    setMood(finishMood)
   }, [])
-  const goStep = useCallback(async (key, l = leadRef.current) => {
+  const goStep = useCallback(async (key, l = leadRef.current, finishMood = 'idle') => {
     setStep(null)
-    await say(STEPS[key].ask(l))
+    await say(STEPS[key].ask(l), finishMood)
     if (STEPS[key].summary) setMsgs((m) => [...m, { from: 'bot', summary: { ...l } }])
     setStep(key)
   }, [say])
@@ -104,15 +114,20 @@ export default function Mascot({ open, setOpen, prefill, chapterId, onGoWorks })
     const base = pf?.type ? { type: pf.type, ref: pf.ref } : {}
     setLead(base); leadRef.current = base
     if (pf?.type) {
+      setMood('happy')
       await say(['Привет! Я Капля 💧 Соберу бриф и сразу передам его в Telegram.'])
       setMsgs((m) => [...m, { from: 'me', text: pf.ref ? `Хочу так же, как ${pf.ref}` : `Нужно: ${pf.type}` }])
       setHistory([{ step: 'type', lead: {}, msgsLength: 0 }])
       goStep('task', base)
-    } else goStep('type', base)
+    } else {
+      setMood('wink')
+      goStep('type', base)
+    }
   }, [say, goStep])
 
   const goBack = useCallback(() => {
     if (!history.length || typing) return
+    setMood('wink')
     const prev = history[history.length - 1]
     setHistory((h) => h.slice(0, -1))
     setLead(prev.lead)
@@ -120,20 +135,35 @@ export default function Mascot({ open, setOpen, prefill, chapterId, onGoWorks })
     if (prev.step === 'type' && prev.msgsLength === 0) {
       setMsgs([])
       goStep('type', {})
+      setTimeout(() => setMood('idle'), 600)
       return
     }
     setMsgs((m) => m.slice(0, prev.msgsLength))
     setText('')
     setStep(prev.step)
+    setTimeout(() => setMood('idle'), 600)
   }, [history, typing, goStep])
 
-  // открытие панели
+  // открытие и закрытие панели: микро-эмоции
   useEffect(() => {
-    if (!open) return
+    if (!open) {
+      // если закрыли недозаполненным — капелька на кнопке смущённо грустит
+      if (history.length > 0 && step !== 'after') {
+        setLauncherMood('sad')
+        const t = setTimeout(() => setLauncherMood('idle'), 3500)
+        return () => clearTimeout(t)
+      } else {
+        setLauncherMood('idle')
+      }
+      return
+    }
     setHint(null); setUnread(false)
+    setLauncherMood('wink')
+    const tWink = setTimeout(() => setLauncherMood('idle'), 1200)
     if (prefill || !started.current) { started.current = true; start(prefill) }
     setTimeout(() => inputRef.current?.focus({ preventScroll: true }), 450)
-  }, [open, prefill])
+    return () => clearTimeout(tWink)
+  }, [open, prefill, history.length, step, start])
 
   // закрытие по клику вне чата
   useEffect(() => {
@@ -146,11 +176,17 @@ export default function Mascot({ open, setOpen, prefill, chapterId, onGoWorks })
     return () => document.removeEventListener('pointerdown', onOutside)
   }, [open, setOpen])
 
-  // подсказки по разделам
+  // подсказки по разделам: приветственное подмигивание
   useEffect(() => {
     setHint(null)
     if (open || !M.hints[chapterId] || seen.current.has(chapterId)) return
-    const t1 = setTimeout(() => { seen.current.add(chapterId); setHint(M.hints[chapterId]); setUnread(true) }, chapterId === 'home' ? 2600 : 1100)
+    const t1 = setTimeout(() => {
+      seen.current.add(chapterId)
+      setHint(M.hints[chapterId])
+      setUnread(true)
+      setLauncherMood('wink')
+      setTimeout(() => setLauncherMood('idle'), 1400)
+    }, chapterId === 'home' ? 2600 : 1100)
     const t2 = setTimeout(() => setHint(null), (chapterId === 'home' ? 2600 : 1100) + 5200)
     return () => { clearTimeout(t1); clearTimeout(t2); setHint(null) }
   }, [chapterId, open])
@@ -192,10 +228,17 @@ export default function Mascot({ open, setOpen, prefill, chapterId, onGoWorks })
       }
       return goBack()
     }
-    if (s.min && v.length < s.min) { setStep(null); await say(['Чуть подробнее, пожалуйста 🙏']); setStep(step); return }
-    if (s.validate && !s.validate(v)) { setMsgs((m) => [...m, { from: 'me', text: v }]); setText(''); setStep(null); await say([s.err]); setStep(step); return }
+    if (s.min && v.length < s.min) { setStep(null); setMood('sad'); await say(['Чуть подробнее, пожалуйста 🙏']); setStep(step); return }
+    if (s.validate && !s.validate(v)) { setMsgs((m) => [...m, { from: 'me', text: v }]); setText(''); setStep(null); setMood('sad'); await say([s.err]); setStep(step); return }
 
     setHistory((h) => [...h, { step, lead: { ...leadRef.current }, msgsLength: msgs.length }])
+
+    // Микро-эмоции при ответах
+    if (step === 'budget' && (v === '150 000 ₽+' || v === '80–150 000 ₽')) {
+      setMood('excited')
+    } else {
+      setMood('happy')
+    }
 
     setMsgs((m) => [...m, { from: 'me', text: v }]); setText('')
     const val = s.field === 'type' ? (TYPE_NAME[v] || v) : v
@@ -225,9 +268,9 @@ export default function Mascot({ open, setOpen, prefill, chapterId, onGoWorks })
 
     await sleep(600); setTyping(false)
     setSent(res)
-    if (res === 'ok') { setMood('happy'); await say(['Готово! 🚀 Заявка уже в Telegram у ' + profile.name + '.', 'Ответ — в течение дня. А пока можно посмотреть работы.']) }
-    else if (res === 'demo') { setMood('happy'); await say(['Демо-режим: Telegram-бот ещё не подключён (см. README).', { text: 'Вот так заявка придёт тебе в Telegram 👇', preview: payload }]) }
-    else { setMood('sad'); await say(['Не получилось отправить 😢 Напиши напрямую — бриф я уже скопировала.']); copyBrief(payload) }
+    if (res === 'ok') { await say(['Готово! 🚀 Заявка уже в Telegram у ' + profile.name + '.', 'Ответ — в течение дня. А пока можно посмотреть работы.'], 'happy') }
+    else if (res === 'demo') { await say(['Демо-режим: Telegram-бот ещё не подключён (см. README).', { text: 'Вот так заявка придёт тебе в Telegram 👇', preview: payload }], 'happy') }
+    else { await say(['Не получилось отправить 😢 Напиши напрямую — бриф я уже скопировала.'], 'sad'); copyBrief(payload) }
     setStep('after')
   }
   const copyBrief = (l) => navigator.clipboard?.writeText(briefText(l)).catch(() => {})
@@ -238,9 +281,9 @@ export default function Mascot({ open, setOpen, prefill, chapterId, onGoWorks })
 
   return (
     <>
-      <button ref={launcher} className={`mascot ${open ? 'is-open' : ''} mood-${mood}`} onClick={() => setOpen(!open)}
+      <button ref={launcher} className={`mascot ${open ? 'is-open' : ''} mood-${launcherMood}`} onClick={() => setOpen(!open)}
         aria-label={open ? 'Закрыть чат с Каплей' : 'Открыть чат: оставить заявку'} aria-expanded={open} data-cursor={open ? 'закрыть' : 'бриф'}>
-        <Drop mood={open ? 'happy' : mood} />
+        <Drop mood={open ? 'happy' : launcherMood} />
         {unread && !open && <span className="mascot-dot" />}
       </button>
       {hint && !open && (
