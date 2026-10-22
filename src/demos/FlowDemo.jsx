@@ -55,7 +55,7 @@ export default function FlowDemo({ mini = false, paused = false }) {
     setToast(`🔥 ${hot ? 'Горячая' : 'Новая'} заявка: ${L.name} — ${L.type}, ${rub(L.budget)}\n«${L.msg}»`)
     setCount((c) => c + 1); setRunning(false)
   }
-  useEffect(() => { alive.current = true; let t; if (!paused) t = setTimeout(run, 500); return () => { alive.current = false; clearTimeout(t) } }, [paused])
+  useEffect(() => { alive.current = true; const t = setTimeout(run, 500); return () => { alive.current = false; clearTimeout(t) } }, [])
   useEffect(() => { if (!mini || running || paused) return; const t = setTimeout(run, 2600); return () => clearTimeout(t) }, [running, mini, paused])
 
   return (

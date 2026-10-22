@@ -41,7 +41,7 @@ export default function BotDemo({ mini = false, paused = false }) {
     await sleep(250); run(nx)
   }
 
-  useEffect(() => { alive.current = true; if (!paused) run('start'); return () => { alive.current = false } }, [paused])
+  useEffect(() => { alive.current = true; run('start'); return () => { alive.current = false } }, [])
   useEffect(() => { body.current?.scrollTo({ top: 1e5, behavior: 'smooth' }) }, [msgs, typing, step])
   // автопилот в карточке и подсказка в кейсе
   useEffect(() => {
