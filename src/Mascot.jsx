@@ -169,6 +169,37 @@ export default function Mascot({ open, setOpen, prefill, chapterId, onGoWorks })
 
   const start = useCallback(async (pf) => {
     setMsgs([]); setSent(null); setHistory([])
+    if (pf?.calc) {
+      const base = {
+        type: pf.type,
+        ref: pf.ref || 'Калькулятор',
+        task: pf.task,
+        budget: pf.budget,
+        deadline: pf.deadline,
+      }
+      setLead(base); leadRef.current = base
+      setMood('excited')
+      await say([
+        `Привет! Я Капля 💧 Вижу твой расчёт: ${pf.type} (~${pf.estimate || pf.budget}) 🚀`,
+        'Параметры и выбранные функции уже внесены в бриф. Осталось уточнить контакт для связи.'
+      ])
+      setMsgs((m) => [
+        ...m,
+        {
+          from: 'me',
+          text: `📋 Расчёт из калькулятора:\n• ${pf.task}\n• Ориентир бюджета: ${pf.budget}\n• Срок: ${pf.deadline}`
+        }
+      ])
+      setHistory([
+        { step: 'type', lead: { type: pf.type }, msgsLength: 0 },
+        { step: 'task', lead: { type: pf.type, task: pf.task }, msgsLength: 1 },
+        { step: 'budget', lead: { type: pf.type, task: pf.task, budget: pf.budget }, msgsLength: 1 },
+        { step: 'deadline', lead: base, msgsLength: 1 },
+      ])
+      goStep('name', base)
+      return
+    }
+
     const base = pf?.type ? { type: pf.type, ref: pf.ref } : {}
     setLead(base); leadRef.current = base
     if (pf?.type) {

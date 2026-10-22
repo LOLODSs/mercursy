@@ -3,6 +3,7 @@ import { createStage, hasGL } from './stage.js'
 import { posters, chapters } from './posters.js'
 import { profile, services, projects, process, pricing, reviews, site } from './config.js'
 import Mascot from './Mascot.jsx'
+import Calculator from './Calculator.jsx'
 import Demo from './demos/index.jsx'
 import { useFocusTrap } from './a11y.js'
 import { isMobile } from './mq.js'
@@ -80,9 +81,12 @@ export default function App() {
   const [leaving, setLeaving] = useState(false)
   const [openCase, setOpenCase] = useState(null)
   const [chat, setChat] = useState({ open: false, prefill: null })
+  const [calcOpen, setCalcOpen] = useState(false)
+  const openCalc = () => setCalcOpen(true)
+  const closeCalc = () => setCalcOpen(false)
   const lock = useRef(false)
   const chRef = useRef(start.current.i)
-  const overlay = !!openCase
+  const overlay = !!openCase || calcOpen
   // тумблер 3D: выбор запоминаем; без WebGL или при «экономии трафика» по умолчанию лёгкий режим
   const canGL = useRef(hasGL()).current
   const [fx, setFx] = useState(() => {
@@ -213,7 +217,7 @@ export default function App() {
       ty = null
     }
     const onKey = (e) => {
-      if (e.key === 'Escape') { if (openCase) closeCase(); else if (chat.open) setChat((c) => ({ ...c, open: false })) }
+      if (e.key === 'Escape') { if (calcOpen) closeCalc(); else if (openCase) closeCase(); else if (chat.open) setChat((c) => ({ ...c, open: false })) }
       if (busy(e) || isMobile()) return
       if (e.key === ' ' && e.target.closest?.('button,a,[role=button]')) return
       if (['ArrowDown', 'PageDown', ' '].includes(e.key)) { e.preventDefault(); go(chRef.current + 1) }
@@ -283,9 +287,9 @@ export default function App() {
       <main className={`chapter ch-${id} ${leaving ? 'leaving' : ''} ${ready ? '' : 'wait'}`} key={shown} tabIndex={0} aria-label={chapters[shown].name} inert={overlay}>
         <ChapterHeading id={id} />
         {id === 'home' && <Home go={go} openChat={openChat} />}
-        {id === 'services' && <Services openType={openType} />}
+        {id === 'services' && <Services openType={openType} openCalc={openCalc} />}
         {id === 'works' && <Works onOpen={showCase} covered={overlay} />}
-        {id === 'process' && <Process openChat={openChat} />}
+        {id === 'process' && <Process openChat={openChat} openCalc={openCalc} />}
         {id === 'reviews' && <Reviews />}
         {id === 'about' && <About />}
         {id === 'contact' && <Contact openChat={openChat} />}
@@ -295,6 +299,15 @@ export default function App() {
       {openCase && <Case data={openCase} onClose={closeCase}
         onNext={() => { const k = (openCase.idx + 1) % projects.length; const c = { ...projects[k], idx: k, ox: innerWidth / 2, oy: innerHeight / 2 }; history.replaceState(history.state, '', `#works/${slugOf(c, k)}`); setOpenCase(c) }}
         onContact={() => openChat({ type: openCase.type, ref: openCase.title || null })} />}
+      {calcOpen && (
+        <Calculator
+          onClose={closeCalc}
+          onOrder={(data) => {
+            closeCalc()
+            openChat(data)
+          }}
+        />
+      )}
       {slowAsk && fx && (
         <div className="slow-ask" role="status">
           <span>Кажется, ртуть подтормаживает на&nbsp;этом устройстве.</span>
@@ -361,7 +374,7 @@ function Home({ go, openChat }) {
   )
 }
 
-function Services({ openType }) {
+function Services({ openType, openCalc }) {
   return (
     <>
       <h2 className="sr">Что делаю</h2>
@@ -374,6 +387,14 @@ function Services({ openType }) {
             <div className="svc-foot"><b>{s.price}</b><button onClick={() => openType(['Сайт', 'Бот', 'Автоматизация'][i])}>Пример вживую →</button></div>
           </article>
         ))}
+        <button type="button" className="svc-calc-cta glass" onClick={openCalc} data-cursor="расчёт" title="Открыть калькулятор проекта">
+          <span className="svc-calc-spark">⚡</span>
+          <div className="svc-calc-text">
+            <b>Калькулятор сметы</b>
+            <small>Собери свой проект и узнай цену за 30 сек</small>
+          </div>
+          <span className="svc-calc-arr">→</span>
+        </button>
       </div>
     </>
   )
@@ -792,7 +813,7 @@ function Case({ data, onClose, onContact, onNext }) {
   )
 }
 
-function Process({ openChat }) {
+function Process({ openChat, openCalc }) {
   return (
     <>
       <h2 className="sr">Как я работаю</h2>
@@ -813,7 +834,10 @@ function Process({ openChat }) {
               </div>
             ))}
           </div>
-          <button className="btn chrome" onClick={() => openChat()}>Пройти бриф за минуту</button>
+          <div className="proc-actions">
+            <button className="btn chrome" onClick={() => openChat()}>Пройти бриф за минуту</button>
+            <button type="button" className="btn line btn-calc" onClick={openCalc} data-cursor="расчёт">⚡ Калькулятор сметы</button>
+          </div>
         </div>
       </div>
     </>
