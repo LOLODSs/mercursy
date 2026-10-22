@@ -147,6 +147,10 @@ export default function Mascot({ open, setOpen, prefill, chapterId, onGoWorks })
   }
   const [sent, setSent] = useState(null)
   const [history, setHistory] = useState([])
+  const stepRef = useRef(step); stepRef.current = step
+  const historyRef = useRef(history); historyRef.current = history
+  const lastPrefillRef = useRef(null)
+  const prevOpenRef = useRef(false)
   const started = useRef(false), seen = useRef(new Set()), body = useRef(null), panel = useRef(null), launcher = useRef(null), hp = useRef(null), inputRef = useRef(null)
   const leadRef = useRef({}); leadRef.current = lead
 
@@ -234,11 +238,13 @@ export default function Mascot({ open, setOpen, prefill, chapterId, onGoWorks })
     setTimeout(() => setMood('idle'), 600)
   }, [history, typing, goStep])
 
-  // открытие и закрытие панели: микро-эмоции
+  // открытие и закрытие панели: микро-эмоции без паразитных перезапусков
   useEffect(() => {
+    const wasOpen = prevOpenRef.current
+    prevOpenRef.current = open
+
     if (!open) {
-      // если закрыли недозаполненным — капелька на кнопке смущённо грустит
-      if (history.length > 0 && step !== 'after') {
+      if (wasOpen && historyRef.current.length > 0 && stepRef.current !== 'after') {
         setLauncherMood('sad')
         const t = setTimeout(() => setLauncherMood('idle'), 3500)
         return () => clearTimeout(t)
@@ -247,13 +253,22 @@ export default function Mascot({ open, setOpen, prefill, chapterId, onGoWorks })
       }
       return
     }
-    setHint(null); setUnread(false)
+
+    setHint(null)
+    setUnread(false)
     setLauncherMood('wink')
     const tWink = setTimeout(() => setLauncherMood('idle'), 1200)
-    if (prefill || !started.current) { started.current = true; start(prefill) }
+
+    const isNewPrefill = prefill && prefill !== lastPrefillRef.current
+    if (!started.current || isNewPrefill) {
+      started.current = true
+      lastPrefillRef.current = prefill
+      start(prefill)
+    }
+
     setTimeout(() => inputRef.current?.focus({ preventScroll: true }), 450)
     return () => clearTimeout(tWink)
-  }, [open, prefill, history.length, step, start])
+  }, [open, prefill, start])
 
   // закрытие по клику вне чата
   useEffect(() => {
