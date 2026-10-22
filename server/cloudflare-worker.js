@@ -912,6 +912,13 @@ export default {
       const hasKV = Boolean(env && env.CRM)
 
       // =============================================================
+      // 0. СЛУЖЕБНЫЕ АПДЕЙТЫ TELEGRAM
+      // =============================================================
+      if (data.update_id && !data.callback_query && !data.message) {
+        return new Response('OK', { headers: cors })
+      }
+
+      // =============================================================
       // 1. ИНТЕРАКТИВНЫЕ ДЕЙСТВИЯ (Callback Queries)
       // =============================================================
       if (data.callback_query) {
@@ -1371,11 +1378,16 @@ export default {
       // =============================================================
       // 2. ОБРАБОТКА ТЕКСТОВЫХ СООБЩЕНИЙ И НИЖНЕЙ КЛАВИАТУРЫ
       // =============================================================
-      if (data.message && data.message.text) {
+      if (data.message) {
         const msg = data.message
-        const fromChatId = msg.chat.id
-        const t = (msg.text || '').trim()
+        const fromChatId = msg.chat?.id
+        const t = (msg.text || msg.caption || '').trim()
         const fromUser = msg.from?.username ? `@${msg.from.username}` : (msg.from?.first_name || 'Админ')
+
+        if (!t) {
+          // Медиа без текста (стикер, аудио, фото без подписи) от пользователя Telegram
+          return new Response('OK', { headers: cors })
+        }
 
         const state = await getAdminState(env, fromChatId)
         let leads = await getLeads(env)
@@ -1654,6 +1666,21 @@ export default {
           })
           return new Response('OK', { headers: cors })
         }
+
+        // Если пришло любое другое сообщение — открываем панель CRM и даём подсказку
+        await setAdminState(env, fromChatId, null)
+        const { text: dText, reply_markup: dMarkup } = renderAdminDashboard(leads, hasKV)
+        await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: fromChatId,
+            text: dText,
+            parse_mode: 'HTML',
+            reply_markup: dMarkup,
+          }),
+        })
+        return new Response('OK', { headers: cors })
       }
 
       // =============================================================
