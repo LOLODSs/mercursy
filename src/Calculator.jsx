@@ -1,16 +1,16 @@
-import { useState, useId, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { playWaterDrop } from './audio.js'
 import { useFocusTrap } from './a11y.js'
 import { isMobile } from './mq.js'
 
-const TYPES = [
+const CORE_TYPES = [
   {
     id: 'website',
     name: 'Сайт / Лендинг',
     basePrice: 40000,
     baseDays: [5, 7],
     icon: '🌐',
-    desc: 'Адаптивный сайт с чистым кодом, высокой скоростью и плавной анимацией',
+    desc: 'Адаптивный сайт с 3D, плавной анимацией и высокой конверсией',
   },
   {
     id: 'bot',
@@ -28,15 +28,6 @@ const TYPES = [
     icon: '⚡',
     desc: 'Связка сервисов, авто-обработка заявок, синхронизация с CRM и базами',
   },
-  {
-    id: 'combo',
-    name: 'Сайт + Telegram-бот',
-    basePrice: 60000,
-    baseDays: [7, 10],
-    icon: '🚀',
-    badge: 'Экономия 5 000 ₽',
-    desc: 'Единая экосистема: сайт привлекает клиентов, бот мгновенно ведёт продажи',
-  },
 ]
 
 const OPTIONS = [
@@ -47,7 +38,7 @@ const OPTIONS = [
     days: 2,
     icon: '🌌',
     desc: 'Интерактивные 3D-модели (Three.js), жидкие эффекты, кастомный курсор',
-    for: ['website', 'combo'],
+    for: ['website'],
   },
   {
     id: 'payments',
@@ -56,7 +47,7 @@ const OPTIONS = [
     days: 1,
     icon: '💳',
     desc: 'ЮKassa, Telegram Stars, СБП, Robokassa с чеками',
-    for: ['website', 'bot', 'combo'],
+    for: ['website', 'bot'],
   },
   {
     id: 'ai',
@@ -65,7 +56,7 @@ const OPTIONS = [
     days: 2,
     icon: '🧠',
     desc: 'Умный ассистент с обучением на данных твоей компании',
-    for: ['website', 'bot', 'automation', 'combo'],
+    for: ['website', 'bot', 'automation'],
   },
   {
     id: 'crm',
@@ -74,7 +65,7 @@ const OPTIONS = [
     days: 1,
     icon: '📊',
     desc: 'Google Таблицы, Notion, PostgreSQL или Telegram-админка',
-    for: ['website', 'bot', 'automation', 'combo'],
+    for: ['website', 'bot', 'automation'],
   },
   {
     id: 'webapp',
@@ -83,7 +74,17 @@ const OPTIONS = [
     days: 2,
     icon: '📱',
     desc: 'Интерактивное веб-приложение прямо внутри Telegram',
-    for: ['bot', 'combo'],
+    for: ['bot'],
+  },
+  {
+    id: 'n8n_addon',
+    title: 'Автоматизация n8n (доп. модуль)',
+    price: 15000,
+    days: 2,
+    icon: '⚡',
+    desc: 'Подключение сценариев n8n, сбор лидов, авто-воронка и вебхуки',
+    for: ['website', 'bot'],
+    hideIfSelected: 'automation',
   },
   {
     id: 'urgent',
@@ -92,12 +93,13 @@ const OPTIONS = [
     icon: '🔥',
     badge: '–40% по сроку',
     desc: 'Приоритетная разработка без выходных в сжатые сроки',
-    for: ['website', 'bot', 'automation', 'combo'],
+    for: ['website', 'bot', 'automation'],
   },
 ]
 
 export default function Calculator({ onClose, onOrder }) {
-  const [selectedType, setSelectedType] = useState('website')
+  // Выбранные базовые направления (мультиселект: сайт, бот, автоматизация)
+  const [selectedTypes, setSelectedTypes] = useState(new Set(['website']))
   const [selectedOpts, setSelectedOpts] = useState(new Set())
   const panelRef = useRef(null)
 
@@ -117,11 +119,82 @@ export default function Calculator({ onClose, onOrder }) {
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
 
-  const typeObj = TYPES.find((t) => t.id === selectedType) || TYPES[0]
-  const availableOpts = OPTIONS.filter((o) => o.for.includes(selectedType))
+  const isMuted = () => {
+    try { return localStorage.getItem('mercury_sound_muted') === 'true' } catch { return false }
+  }
 
-  // Расчёт стоимости и сроков
-  let baseSum = typeObj.basePrice
+  const isAllSelected = selectedTypes.has('website') && selectedTypes.has('bot') && selectedTypes.has('automation')
+
+  const handleToggleType = (id) => {
+    setSelectedTypes((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        if (next.size > 1) {
+          next.delete(id)
+          playWaterDrop('pop', isMuted())
+        }
+      } else {
+        next.add(id)
+        playWaterDrop('bloop', isMuted())
+      }
+      return next
+    })
+  }
+
+  const handleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedTypes(new Set(['website']))
+      playWaterDrop('pop', isMuted())
+    } else {
+      setSelectedTypes(new Set(['website', 'bot', 'automation']))
+      playWaterDrop('bloop', isMuted())
+    }
+  }
+
+  // Фильтрация доступных опций
+  const availableOpts = OPTIONS.filter((o) => {
+    if (o.hideIfSelected && selectedTypes.has(o.hideIfSelected)) return false
+    return o.for.some((f) => selectedTypes.has(f))
+  })
+
+  // Очистка опций, которые больше не подходят выбранным типам
+  useEffect(() => {
+    setSelectedOpts((prev) => {
+      const valid = new Set()
+      const availIds = new Set(availableOpts.map((o) => o.id))
+      prev.forEach((id) => {
+        if (availIds.has(id)) valid.add(id)
+      })
+      return valid
+    })
+  }, [selectedTypes])
+
+  // Расчёт базовой суммы и сроков
+  let rawBase = 0
+  let minDaysSum = 0
+  let maxDaysSum = 0
+
+  selectedTypes.forEach((typeId) => {
+    const t = CORE_TYPES.find((x) => x.id === typeId)
+    if (t) {
+      rawBase += t.basePrice
+      minDaysSum += t.baseDays[0]
+      maxDaysSum += t.baseDays[1]
+    }
+  })
+
+  // Комбо-скидка и параллельные сроки
+  let comboDiscount = 0
+  let daysScale = 1
+  if (selectedTypes.size === 2) {
+    comboDiscount = 5000
+    daysScale = 0.8
+  } else if (selectedTypes.size >= 3) {
+    comboDiscount = 10000
+    daysScale = 0.7
+  }
+
+  let baseSum = Math.max(0, rawBase - comboDiscount)
   let addDays = 0
 
   availableOpts.forEach((opt) => {
@@ -133,26 +206,8 @@ export default function Calculator({ onClose, onOrder }) {
 
   const isUrgent = selectedOpts.has('urgent')
   const finalPrice = Math.round(isUrgent ? baseSum * 1.25 : baseSum)
-  const minDays = Math.max(1, Math.round((typeObj.baseDays[0] + addDays) * (isUrgent ? 0.6 : 1)))
-  const maxDays = Math.max(2, Math.round((typeObj.baseDays[1] + addDays) * (isUrgent ? 0.6 : 1)))
-
-  const isMuted = () => {
-    try { return localStorage.getItem('mercury_sound_muted') === 'true' } catch { return false }
-  }
-
-  const handleSelectType = (id) => {
-    playWaterDrop('bloop', isMuted())
-    setSelectedType(id)
-    // убираем опции, не подходящие новому типу
-    setSelectedOpts((prev) => {
-      const next = new Set()
-      const newAvail = OPTIONS.filter((o) => o.for.includes(id)).map((o) => o.id)
-      prev.forEach((optId) => {
-        if (newAvail.includes(optId)) next.add(optId)
-      })
-      return next
-    })
-  }
+  const minDays = Math.max(1, Math.round((minDaysSum * daysScale + addDays) * (isUrgent ? 0.6 : 1)))
+  const maxDays = Math.max(2, Math.round((maxDaysSum * daysScale + addDays) * (isUrgent ? 0.6 : 1)))
 
   const handleToggleOpt = (id) => {
     setSelectedOpts((prev) => {
@@ -174,19 +229,26 @@ export default function Calculator({ onClose, onOrder }) {
       .filter((o) => selectedOpts.has(o.id))
       .map((o) => o.title)
 
+    const names = []
+    if (selectedTypes.has('website')) names.push('Сайт')
+    if (selectedTypes.has('bot')) names.push('Telegram-бот')
+    if (selectedTypes.has('automation')) names.push('Автоматизация')
+    const typeTitle = names.join(' + ')
+
     const priceFormatted = `${finalPrice.toLocaleString('ru-RU')} ₽`
     const daysFormatted = `${minDays}–${maxDays} дней`
+    const comboNote = comboDiscount > 0 ? ` (скидка комбо –${comboDiscount.toLocaleString('ru-RU')} ₽)` : ''
 
     const taskDescription = [
-      `${typeObj.name} (~${priceFormatted})`,
+      `${typeTitle}${comboNote} (~${priceFormatted})`,
       activeOptTitles.length > 0 ? `Опции: ${activeOptTitles.join(', ')}` : 'Базовая комплектация',
       `Срок: ${daysFormatted}`,
     ].join(' • ')
 
     onOrder({
       calc: true,
-      type: typeObj.name.includes('Сайт') ? 'Сайт' : typeObj.name.includes('бот') ? 'Бот' : 'Автоматизация',
-      budget: `${priceFormatted}`,
+      type: typeTitle,
+      budget: priceFormatted,
       deadline: daysFormatted,
       estimate: priceFormatted,
       task: taskDescription,
@@ -201,7 +263,7 @@ export default function Calculator({ onClose, onOrder }) {
           <div>
             <span className="calc-badge">⚡ Интерактивный расчёт</span>
             <h2>Калькулятор проекта</h2>
-            <p>Выбери основу и нужные функции — получи честную вилку цен и сроков за 30 секунд</p>
+            <p>Выбери одно или несколько направлений — получи честную вилку цен и сроков за 30 секунд</p>
           </div>
           <button className="calc-x" onClick={onClose} aria-label="Закрыть калькулятор" data-cursor="закрыть">
             <svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true">
@@ -211,34 +273,82 @@ export default function Calculator({ onClose, onOrder }) {
         </header>
 
         <div className="calc-body">
-          {/* Шаг 1: Тип проекта */}
+          {/* Шаг 1: Направления разработки (мультивыбор) */}
           <section className="calc-sec">
             <label className="calc-sec-title">
               <span className="calc-step-num">1</span>
               <span>Что разрабатываем?</span>
+              <small className="calc-sec-sub">Выбирай любые направления — при комбо скидка до 10 000 ₽</small>
             </label>
             <div className="calc-types-grid">
-              {TYPES.map((t) => {
-                const active = selectedType === t.id
+              {CORE_TYPES.map((t) => {
+                const active = selectedTypes.has(t.id)
                 return (
                   <button
                     key={t.id}
                     type="button"
                     className={`calc-type-card ${active ? 'is-active' : ''}`}
-                    onClick={() => handleSelectType(t.id)}
-                    data-cursor="выбрать"
+                    onClick={() => handleToggleType(t.id)}
+                    data-cursor={active ? 'убрать' : 'выбрать'}
+                    aria-pressed={active}
                   >
                     <div className="calc-card-top">
                       <span className="calc-type-icon">{t.icon}</span>
-                      {t.badge && <span className="calc-pill-badge">{t.badge}</span>}
                       <b className="calc-type-price">от {t.basePrice.toLocaleString('ru-RU')} ₽</b>
+                      <span className={`calc-checkbox ${active ? 'checked' : ''}`} aria-hidden="true">
+                        {active && (
+                          <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="3 8 7 12 13 4" />
+                          </svg>
+                        )}
+                      </span>
                     </div>
                     <strong className="calc-type-name">{t.name}</strong>
                     <span className="calc-type-desc">{t.desc}</span>
                   </button>
                 )
               })}
+
+              {/* 4-я карточка: Всё под ключ */}
+              <button
+                type="button"
+                className={`calc-type-card calc-type-card--all ${isAllSelected ? 'is-active' : ''}`}
+                onClick={handleSelectAll}
+                data-cursor="комбо"
+                aria-pressed={isAllSelected}
+              >
+                <div className="calc-card-top">
+                  <span className="calc-type-icon">💎</span>
+                  <span className="calc-pill-badge" style={{ color: '#ff9ad5', borderColor: 'rgba(255,154,213,.4)', background: 'rgba(255,154,213,.15)' }}>
+                    Выгода 10 000 ₽
+                  </span>
+                  <b className="calc-type-price">от 70 000 ₽</b>
+                  <span className={`calc-checkbox ${isAllSelected ? 'checked' : ''}`} aria-hidden="true">
+                    {isAllSelected && (
+                      <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="3 8 7 12 13 4" />
+                      </svg>
+                    )}
+                  </span>
+                </div>
+                <strong className="calc-type-name">Всё под ключ: Сайт + Бот + n8n</strong>
+                <span className="calc-type-desc">Полная экосистема: сайт привлекает лиды, бот их закрывает, n8n рулит CRM и сценариями</span>
+              </button>
             </div>
+
+            {/* Плашка активного комбо */}
+            {selectedTypes.size === 2 && (
+              <div className="calc-combo-alert">
+                <span>🎉</span>
+                <span>Выбрано 2 направления — комбо-скидка <b>–5 000 ₽</b> уже учтена в расчёте!</span>
+              </div>
+            )}
+            {isAllSelected && (
+              <div className="calc-combo-alert calc-combo-alert--max">
+                <span>🚀</span>
+                <span>Выбрана полная экосистема — максимальная скидка <b>–10 000 ₽</b> уже учтена в расчёте!</span>
+              </div>
+            )}
           </section>
 
           {/* Шаг 2: Дополнительные опции */}
@@ -258,6 +368,7 @@ export default function Calculator({ onClose, onOrder }) {
                     className={`calc-opt-card ${active ? 'is-active' : ''}`}
                     onClick={() => handleToggleOpt(opt.id)}
                     data-cursor="опция"
+                    aria-pressed={active}
                   >
                     <div className="calc-opt-check">
                       <span className={`calc-checkbox ${active ? 'checked' : ''}`} aria-hidden="true">
@@ -290,7 +401,12 @@ export default function Calculator({ onClose, onOrder }) {
           <div className="calc-summary">
             <div className="calc-total">
               <span className="calc-total-lbl">Ориентир бюджета:</span>
-              <b className="calc-total-val">~{finalPrice.toLocaleString('ru-RU')} ₽</b>
+              <div className="calc-total-row">
+                <b className="calc-total-val">~{finalPrice.toLocaleString('ru-RU')} ₽</b>
+                {comboDiscount > 0 && (
+                  <span className="calc-discount-tag">–{comboDiscount.toLocaleString('ru-RU')} ₽ скидка</span>
+                )}
+              </div>
             </div>
             <div className="calc-time">
               <span className="calc-time-lbl">Срок:</span>
