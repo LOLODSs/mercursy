@@ -262,8 +262,29 @@ export default function Mascot({ open, setOpen, prefill, chapterId, onGoWorks })
             </button>
           )}
           <span className="chat-ava"><Drop mood={mood} /></span>
-          <div><b>{M.name} · ассистент {profile.name}</b><small><i />{typing ? 'печатает…' : 'онлайн · ответ в течение дня'}</small></div>
-          <button className="chat-x" onClick={() => setOpen(false)} aria-label="Закрыть"><svg width="14" height="14" viewBox="0 0 18 18" aria-hidden="true"><path d="M3 3l12 12M15 3L3 15" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" /></svg></button>
+          <div className="chat-head-info">
+            <b>{M.name} · ассистент {profile.name}</b>
+            <small><i />{typing ? 'печатает…' : 'онлайн · ответ в течение дня'}</small>
+          </div>
+          <div className="chat-head-actions">
+            <a
+              className="chat-tg"
+              href={profile.telegram}
+              target="_blank"
+              rel="noreferrer"
+              aria-label={`Написать ${profile.telegramLabel} в Telegram напрямую`}
+              title={`Написать напрямую в Telegram (${profile.telegramLabel})`}
+              data-cursor="в тг"
+            >
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" aria-hidden="true">
+                <path d="m21 3-7 18-4-7-7-4L21 3Z" />
+                <path d="m10 14 5-5" strokeLinecap="round" />
+              </svg>
+            </a>
+            <button className="chat-x" onClick={() => setOpen(false)} aria-label="Закрыть" data-cursor="закрыть">
+              <svg width="14" height="14" viewBox="0 0 18 18" aria-hidden="true"><path d="M3 3l12 12M15 3L3 15" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" /></svg>
+            </button>
+          </div>
         </header>
         <div className="chat-body" ref={body} aria-live="polite">
           {msgs.map((m, i) => (
