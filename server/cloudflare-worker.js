@@ -233,6 +233,105 @@ async function sendLeadsCsvDocument(botToken, chatId, leads) {
   })
 }
 
+// =============================================================
+// КОНТРОЛЬ ЗАВИСШИХ ПРОЕКТОВ И ДЕДЛАЙНОВ
+// =============================================================
+function getDaysSince(isoStr) {
+  if (!isoStr) return 0
+  const d = new Date(isoStr)
+  if (isNaN(d.getTime())) return 0
+  const diffMs = Date.now() - d.getTime()
+  return Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)))
+}
+
+function findStaleLeads(leads, daysThreshold = 5) {
+  const inWorkStale = []
+  const newStale = []
+
+  for (const l of leads) {
+    if (l.status === 'in_progress') {
+      const lastActivity = l.updatedAt || l.createdAt
+      const days = getDaysSince(lastActivity)
+      if (days >= daysThreshold) {
+        inWorkStale.push({ lead: l, days, lastActivity })
+      }
+    } else if (l.status === 'new' || !l.status) {
+      const days = getDaysSince(l.createdAt)
+      if (days >= 1) {
+        newStale.push({ lead: l, days })
+      }
+    }
+  }
+
+  return { inWorkStale, newStale, total: inWorkStale.length + newStale.length }
+}
+
+function renderStaleLeads(leads) {
+  const { inWorkStale, newStale, total } = findStaleLeads(leads, 5)
+
+  if (!total) {
+    return {
+      text: [
+        '⏰ <b>Контроль сделок и дедлайнов Mercury</b>',
+        '',
+        '🎉 <b>Все проекты активны и под контролем!</b>',
+        '',
+        '• Нет проектов «В работе» без новостей дольше 5 дней.',
+        '• Нет забытых новых заявок старше 24 часов.',
+        '',
+        'Красавцы, темп отличный! 🚀',
+      ].join('\n'),
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '🟡 В работе', callback_data: 'crm:list:in_progress' }],
+          [{ text: '🔙 В главное меню', callback_data: 'crm:home' }],
+        ],
+      },
+    }
+  }
+
+  const lines = [
+    '⏰ <b>Контроль зависших сделок Mercury</b>',
+    '',
+    `Найдено проектов, требующих внимания: <b>${total}</b>`,
+    '',
+  ]
+
+  if (newStale.length) {
+    lines.push('⚠️ <b>Неразобранные новые заявки (> 24 ч):</b>')
+    newStale.forEach((item, idx) => {
+      lines.push(`<b>${idx + 1}. ${esc(item.lead.name)}</b> (${esc(item.lead.contact)})`)
+      lines.push(`• Ждёт ответа: <b>${item.days} дн.</b> | Бюджет: ${esc(item.lead.budget || 'договорённость')}`)
+      lines.push('')
+    })
+  }
+
+  if (inWorkStale.length) {
+    lines.push('🔔 <b>Проекты «В работе» без новостей > 5 дней:</b>')
+    inWorkStale.forEach((item, idx) => {
+      const assigneeStr = item.lead.assignee ? `👤 Ведёт: <b>${esc(item.lead.assignee)}</b>` : '👤 <i>Без ответственного</i>'
+      lines.push(`<b>${idx + 1}. ${esc(item.lead.name)}</b> (${assigneeStr})`)
+      lines.push(`• Тишина: <b>${item.days} дн.</b> | Бюджет: ${esc(item.lead.budget || 'договорённость')}`)
+      lines.push(`• Оплата: ${item.lead.paymentStatus === 'prepay_50' ? '💳 Аванс 50%' : (item.lead.paymentStatus === 'paid_100' ? '✅ Оплачен 100%' : '⏳ Ожидает аванс')}`)
+      lines.push('')
+    })
+  }
+
+  lines.push('💡 <i>Нажми на проект ниже, чтобы написать клиенту или оставить заметку:</i>')
+
+  const allStale = [...newStale.map((s) => s.lead), ...inWorkStale.map((s) => s.lead)].slice(0, 6)
+  const buttons = allStale.map((l, idx) => [
+    { text: `${idx + 1}. 📁 ${l.name} (${l.budget || 'открыть'})`.slice(0, 36), callback_data: `crm:view:${l.id}` },
+    { text: '📝 Заметка', callback_data: `crm:note:${l.id}` },
+  ])
+
+  buttons.push([
+    { text: '🔙 В главное меню', callback_data: 'crm:home' },
+  ])
+
+  return { text: lines.join('\n'), reply_markup: { inline_keyboard: buttons } }
+}
+
 // Автоматический парсер сделки из сообщения
 function parseLeadFromMessage(rawText, messageId) {
   if (!rawText) return null
@@ -410,6 +509,11 @@ function renderAdminDashboard(leads, hasKV) {
     : done.length === 1 && done[0].budget ? done[0].budget
     : formatRubles(doneSum)
 
+  const staleInfo = findStaleLeads(leads, 5)
+  const staleNotice = staleInfo.total > 0
+    ? `\n⚠️ <b>Внимание:</b> <b>${staleInfo.total}</b> проектов без новостей (> 5 дн.)`
+    : ''
+
   const text = [
     '📊 <b>Панель управления Mercury CRM</b>',
     hasKV ? '<i>💾 Облачная база KV: подключена</i>' : '<i>⚠️ База KV не подключена (данные во временной памяти)</i>',
@@ -421,9 +525,20 @@ function renderAdminDashboard(leads, hasKV) {
     `• 📁 Всего в базе: <b>${total}</b>`,
     '',
     `💰 <b>Общая сумма завершённых:</b> <b>${doneDisplay}</b>`,
+    staleNotice,
     '',
     'Выбери категорию или действие ниже:',
-  ].join('\n')
+  ].filter(Boolean).join('\n')
+
+  const searchRow = staleInfo.total > 0
+    ? [
+        { text: `⏰ Зависшие (${staleInfo.total})`, callback_data: 'crm:stale' },
+        { text: '📥 Скачать базу (.csv)', callback_data: 'crm:export' },
+      ]
+    : [
+        { text: '🔍 Поиск', callback_data: 'crm:search' },
+        { text: '📥 Скачать базу (.csv)', callback_data: 'crm:export' },
+      ]
 
   const reply_markup = {
     inline_keyboard: [
@@ -439,10 +554,7 @@ function renderAdminDashboard(leads, hasKV) {
         { text: '➕ Создать сделку', callback_data: 'crm:add' },
         { text: '💰 Финансы', callback_data: 'crm:finances' },
       ],
-      [
-        { text: '🔍 Поиск', callback_data: 'crm:search' },
-        { text: '📥 Скачать базу (.csv)', callback_data: 'crm:export' },
-      ],
+      searchRow,
     ],
   }
 
@@ -1229,6 +1341,13 @@ export default {
           return new Response('OK', { headers: cors })
         }
 
+        // 1.14 Контроль зависших сделок и дедлайнов
+        if (cqData === 'crm:stale') {
+          const { text, reply_markup } = renderStaleLeads(leads)
+          await safeEditOrSend(botToken, chatId, msg.message_id, text, reply_markup)
+          return new Response('OK', { headers: cors })
+        }
+
         // 1.13 Отмена действия
         if (cqData === 'crm:cancel') {
           await setAdminState(env, chatId, null)
@@ -1519,6 +1638,22 @@ export default {
           await sendLeadsCsvDocument(botToken, fromChatId, leads)
           return new Response('OK', { headers: cors })
         }
+
+        if (t.includes('Зависшие') || t.includes('зависшие') || t.includes('Дедлайн') || t.includes('дедлайн') || t.toLowerCase() === '/stale') {
+          await setAdminState(env, fromChatId, null)
+          const { text, reply_markup } = renderStaleLeads(leads)
+          await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              chat_id: fromChatId,
+              text,
+              parse_mode: 'HTML',
+              reply_markup,
+            }),
+          })
+          return new Response('OK', { headers: cors })
+        }
       }
 
       // =============================================================
@@ -1631,6 +1766,57 @@ export default {
         status: 500,
         headers: { ...cors, 'Content-Type': 'application/json' },
       })
+    }
+  },
+
+  // =============================================================
+  // АВТОМАТИЧЕСКИЙ УТРЕННИЙ ПИНГ (Cloudflare Cron Triggers)
+  // =============================================================
+  async scheduled(event, env, ctx) {
+    try {
+      const leads = await getLeads(env)
+      const { inWorkStale, newStale, total } = findStaleLeads(leads, 5)
+      if (!total) return
+
+      const botToken = env.TELEGRAM_BOT_TOKEN || DEFAULT_BOT_TOKEN
+      if (!botToken) return
+
+      const rawChatIds = env.TELEGRAM_CHAT_ID || DEFAULT_CHAT_IDS
+      const chatIds = String(rawChatIds).split(',').map((id) => id.trim()).filter(Boolean)
+
+      const text = [
+        '⏰ <b>Утренний контроль сделок Mercury CRM</b>',
+        '',
+        `Напоминание: найдено <b>${total}</b> проектов без новостей:`,
+        ...newStale.map((s) => `• ⚠️ <b>${esc(s.lead.name)}</b>: новая заявка ждёт ответа ${s.days} дн.!`),
+        ...inWorkStale.map((s) => `• 🔔 <b>${esc(s.lead.name)}</b>: тишина ${s.days} дн. (${s.lead.assignee || 'нет ответственного'})`),
+        '',
+        'Нажмите кнопку ниже, чтобы открыть проекты и связаться с клиентами:',
+      ].join('\n')
+
+      const reply_markup = {
+        inline_keyboard: [
+          [{ text: `⏰ Открыть зависшие (${total})`, callback_data: 'crm:stale' }],
+          [{ text: '📊 В CRM', callback_data: 'crm:home' }],
+        ],
+      }
+
+      await Promise.all(
+        chatIds.map((cid) =>
+          fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              chat_id: cid,
+              text,
+              parse_mode: 'HTML',
+              reply_markup,
+            }),
+          }).catch(() => {})
+        )
+      )
+    } catch (err) {
+      console.warn('Scheduled followup error:', err)
     }
   },
 }
