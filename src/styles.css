@@ -184,7 +184,7 @@ a{color:inherit}
 .copy{position:absolute;right:120px;bottom:40px;font-size:12px;color:var(--mute)}
 
 /* cursor */
-.cursor{position:fixed;left:0;top:0;z-index:60;pointer-events:none;display:none;transition:opacity .18s ease}
+.cursor{position:fixed;left:0;top:0;z-index:1000;pointer-events:none;display:none;transition:opacity .18s ease}
 .cursor.hidden{opacity:0!important;visibility:hidden}
 @media (pointer:fine){.cursor{display:block}}
 .cursor::before{content:"";position:absolute;width:10px;height:10px;left:-5px;top:-5px;border-radius:50%;background:#fff;mix-blend-mode:difference;transition:transform .32s cubic-bezier(.2,1.6,.4,1),background-color .2s ease,box-shadow .2s ease}

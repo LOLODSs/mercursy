@@ -317,7 +317,7 @@ export default function App() {
       )}
       {ready && <Mascot open={chat.open} prefill={chat.prefill} setOpen={(o) => (o ? openChat(chat.prefill) : setChat({ open: false, prefill: null }))}
         chapterId={IDS[chapter]} onGoWorks={() => go(IDS.indexOf('works'))} />}
-      {site.customCursor && <Cursor hidden={overlay} />}
+      {site.customCursor && <Cursor hidden={!!openCase} />}
     </div>
   )
 }
