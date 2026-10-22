@@ -388,7 +388,7 @@ function Services({ openType, openCalc }) {
           </article>
         ))}
         <button type="button" className="svc-calc-cta glass" onClick={openCalc} data-cursor="расчёт" title="Открыть калькулятор проекта">
-          <span className="svc-calc-spark">⚡</span>
+          <span className="svc-calc-spark" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m13 2-9 12h8l-2 8 10-13h-8l3-7Z" /></svg></span>
           <div className="svc-calc-text">
             <b>Калькулятор сметы</b>
             <small>Собери свой проект и узнай цену за 30 сек</small>
@@ -856,7 +856,7 @@ function Process({ openChat, openCalc }) {
           </div>
           <div className="proc-actions">
             <button className="btn chrome" onClick={() => openChat()}>Пройти бриф за минуту</button>
-            <button type="button" className="btn line btn-calc" onClick={openCalc} data-cursor="расчёт">⚡ Калькулятор сметы</button>
+            <button type="button" className="btn line btn-calc" onClick={openCalc} data-cursor="расчёт"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ marginRight: '8px' }}><path d="m13 2-9 12h8l-2 8 10-13h-8l3-7Z" /></svg>Калькулятор сметы</button>
           </div>
         </div>
       </div>

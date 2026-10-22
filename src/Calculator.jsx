@@ -3,13 +3,97 @@ import { playWaterDrop } from './audio.js'
 import { useFocusTrap } from './a11y.js'
 import { isMobile } from './mq.js'
 
+export const ICONS = {
+  website: (
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="2" y="3" width="20" height="18" rx="4" />
+      <path d="M2 9h20" />
+      <path d="M6 6h.01M9 6h.01M12 6h.01" />
+      <path d="m8 14-2 2 2 2M16 14l2 2-2 2M13 13l-2 6" />
+    </svg>
+  ),
+  bot: (
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="m21.5 3.5-19 8.5 7.5 3.5 3 6 3-4 5.5 3.5L21.5 3.5Z" />
+      <path d="m10 15.5 11.5-12" />
+    </svg>
+  ),
+  automation: (
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="3" width="6" height="6" rx="2" />
+      <rect x="15" y="3" width="6" height="6" rx="2" />
+      <rect x="9" y="15" width="6" height="6" rx="2" />
+      <path d="M6 9v2.5a2.5 2.5 0 0 0 2.5 2.5h1M18 9v2.5a2.5 2.5 0 0 1-2.5 2.5h-1" />
+      <path d="M12 11.5v3.5" />
+    </svg>
+  ),
+  combo: (
+    <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M6 3h12l4 6-10 12L2 9l4-6Z" />
+      <path d="M2 9h20" />
+      <path d="m12 21 3.5-12" />
+      <path d="m12 21-3.5-12" />
+      <path d="m6 3 2.5 6" />
+      <path d="m18 3-2.5 6" />
+    </svg>
+  ),
+  graphics3d: (
+    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="m21 16-9 5-9-5V8l9-5 9 5v8Z" />
+      <path d="m3 8 9 5 9-5" />
+      <path d="M12 13v8" />
+    </svg>
+  ),
+  payments: (
+    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="2" y="5" width="20" height="14" rx="3" />
+      <path d="M2 10h20" />
+      <path d="M6 15h4" />
+    </svg>
+  ),
+  ai: (
+    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="m12 3-2.5 6.5L3 12l6.5 2.5L12 21l2.5-6.5L21 12l-6.5-2.5L12 3Z" />
+    </svg>
+  ),
+  crm: (
+    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <ellipse cx="12" cy="5" rx="8" ry="3" />
+      <path d="M4 5v6c0 1.66 3.58 3 8 3s8-1.34 8-3V5" />
+      <path d="M4 11v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6" />
+    </svg>
+  ),
+  webapp: (
+    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="5" y="2" width="14" height="20" rx="3.5" />
+      <path d="M10 18h4" />
+      <circle cx="9" cy="8" r="1" fill="currentColor" />
+      <circle cx="15" cy="8" r="1" fill="currentColor" />
+      <circle cx="9" cy="12" r="1" fill="currentColor" />
+      <circle cx="15" cy="12" r="1" fill="currentColor" />
+    </svg>
+  ),
+  n8n_addon: (
+    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="m13 2-9 12h8l-2 8 10-13h-8l3-7Z" />
+    </svg>
+  ),
+  urgent: (
+    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 2v4M4.93 4.93l2.83 2.83M2 12h4M19.07 4.93l-2.83 2.83M22 12h-4" />
+      <path d="M12 18a6 6 0 1 0 0-12 6 6 0 0 0 0 12Z" />
+      <polyline points="12 9 12 12 14 14" />
+    </svg>
+  ),
+}
+
 const CORE_TYPES = [
   {
     id: 'website',
     name: 'Сайт / Лендинг',
     basePrice: 60000,
     baseDays: [5, 7],
-    icon: '🌐',
+    icon: ICONS.website,
     desc: 'Адаптивный сайт с 3D, плавной анимацией и высокой конверсией',
   },
   {
@@ -17,7 +101,7 @@ const CORE_TYPES = [
     name: 'Telegram-бот',
     basePrice: 35000,
     baseDays: [3, 5],
-    icon: '🤖',
+    icon: ICONS.bot,
     desc: 'Бот для приёма заявок, продаж, поддержки клиентов и уведомлений',
   },
   {
@@ -25,7 +109,7 @@ const CORE_TYPES = [
     name: 'Автоматизация n8n',
     basePrice: 25000,
     baseDays: [2, 4],
-    icon: '⚡',
+    icon: ICONS.automation,
     desc: 'Связка сервисов, авто-обработка заявок, синхронизация с CRM и базами',
   },
 ]
@@ -36,7 +120,7 @@ const OPTIONS = [
     title: '3D-графика и WebGL',
     price: 25000,
     days: 2,
-    icon: '🌌',
+    icon: ICONS.graphics3d,
     desc: 'Интерактивные 3D-модели (Three.js), жидкие эффекты, кастомный курсор',
     for: ['website'],
   },
@@ -45,7 +129,7 @@ const OPTIONS = [
     title: 'Приём платежей',
     price: 15000,
     days: 1,
-    icon: '💳',
+    icon: ICONS.payments,
     desc: 'ЮKassa, Telegram Stars, СБП, Robokassa с чеками',
     for: ['website', 'bot'],
   },
@@ -54,7 +138,7 @@ const OPTIONS = [
     title: 'AI-ассистент (ChatGPT/Claude)',
     price: 20000,
     days: 2,
-    icon: '🧠',
+    icon: ICONS.ai,
     desc: 'Умный ассистент с обучением на данных твоей компании',
     for: ['website', 'bot', 'automation'],
   },
@@ -63,7 +147,7 @@ const OPTIONS = [
     title: 'CRM и базы данных',
     price: 15000,
     days: 1,
-    icon: '📊',
+    icon: ICONS.crm,
     desc: 'Google Таблицы, Notion, PostgreSQL или Telegram-админка',
     for: ['website', 'bot', 'automation'],
   },
@@ -72,7 +156,7 @@ const OPTIONS = [
     title: 'Telegram Mini App (WebApp)',
     price: 25000,
     days: 2,
-    icon: '📱',
+    icon: ICONS.webapp,
     desc: 'Интерактивное веб-приложение прямо внутри Telegram',
     for: ['bot'],
   },
@@ -81,7 +165,7 @@ const OPTIONS = [
     title: 'Автоматизация n8n (доп. модуль)',
     price: 25000,
     days: 2,
-    icon: '⚡',
+    icon: ICONS.n8n_addon,
     desc: 'Подключение сценариев n8n, сбор лидов, авто-воронка и вебхуки',
     for: ['website', 'bot'],
     hideIfSelected: 'automation',
@@ -90,7 +174,7 @@ const OPTIONS = [
     id: 'urgent',
     title: 'Срочный запуск (Турбо)',
     rate: 0.25,
-    icon: '🔥',
+    icon: ICONS.urgent,
     badge: '–40% по сроку',
     desc: 'Приоритетная разработка без выходных в сжатые сроки',
     for: ['website', 'bot', 'automation'],
@@ -261,7 +345,12 @@ export default function Calculator({ onClose, onOrder }) {
       <div className="calc-panel glass" ref={panelRef}>
         <header className="calc-head">
           <div>
-            <span className="calc-badge">⚡ Интерактивный расчёт</span>
+            <span className="calc-badge">
+              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ verticalAlign: '-1px', marginRight: '5px' }}>
+                <path d="m13 2-9 12h8l-2 8 10-13h-8l3-7Z" />
+              </svg>
+              Интерактивный расчёт
+            </span>
             <h2>Калькулятор проекта</h2>
             <p>Выбери одно или несколько направлений — получи честную вилку цен и сроков за 30 секунд</p>
           </div>
@@ -318,7 +407,7 @@ export default function Calculator({ onClose, onOrder }) {
                 aria-pressed={isAllSelected}
               >
                 <div className="calc-card-top">
-                  <span className="calc-type-icon">💎</span>
+                  <span className="calc-type-icon">{ICONS.combo}</span>
                   <span className="calc-pill-badge" style={{ color: '#ff9ad5', borderColor: 'rgba(255,154,213,.4)', background: 'rgba(255,154,213,.15)' }}>
                     Выгода 15 000 ₽
                   </span>
@@ -339,13 +428,21 @@ export default function Calculator({ onClose, onOrder }) {
             {/* Плашка активного комбо */}
             {selectedTypes.size === 2 && (
               <div className="calc-combo-alert">
-                <span>🎉</span>
+                <span className="calc-alert-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                  </svg>
+                </span>
                 <span>Выбрано 2 направления — комбо-скидка <b>–7 000 ₽</b> уже учтена в расчёте!</span>
               </div>
             )}
             {isAllSelected && (
               <div className="calc-combo-alert calc-combo-alert--max">
-                <span>🚀</span>
+                <span className="calc-alert-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="m4.5 16.5-1.5 3 3-1.5M12 15l-3-3m7-7-4 4M21 3l-6 1.5L9 10.5 4 12l8 8 1.5-5 6-6L21 3Z" />
+                  </svg>
+                </span>
                 <span>Выбрана полная экосистема — максимальная скидка <b>–15 000 ₽</b> уже учтена в расчёте!</span>
               </div>
             )}
@@ -410,7 +507,13 @@ export default function Calculator({ onClose, onOrder }) {
             </div>
             <div className="calc-time">
               <span className="calc-time-lbl">Срок:</span>
-              <b className="calc-time-val">⏱ {minDays}–{maxDays} дней</b>
+              <b className="calc-time-val">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ verticalAlign: '-2px', marginRight: '6px', color: '#b8f3ff' }}>
+                  <circle cx="12" cy="12" r="10" />
+                  <polyline points="12 6 12 12 15 14" />
+                </svg>
+                {minDays}–{maxDays} дней
+              </b>
             </div>
           </div>
 
