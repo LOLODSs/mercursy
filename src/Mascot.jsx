@@ -151,7 +151,7 @@ export default function Mascot({ open, setOpen, prefill, chapterId, onGoWorks })
   const historyRef = useRef(history); historyRef.current = history
   const lastPrefillRef = useRef(null)
   const prevOpenRef = useRef(false)
-  const started = useRef(false), seen = useRef(new Set()), body = useRef(null), panel = useRef(null), launcher = useRef(null), hp = useRef(null), inputRef = useRef(null)
+  const started = useRef(false), seen = useRef(new Set()), body = useRef(null), panel = useRef(null), launcher = useRef(null), avaRef = useRef(null), hp = useRef(null), inputRef = useRef(null)
   const leadRef = useRef({}); leadRef.current = lead
 
   useFocusTrap(panel, open, () => setOpen(false), { trap: isMobile() })
@@ -298,18 +298,38 @@ export default function Mascot({ open, setOpen, prefill, chapterId, onGoWorks })
 
   useEffect(() => { body.current?.scrollTo({ top: 1e6, behavior: 'smooth' }) }, [msgs, typing, step])
 
-  // глаза следят за курсором
+  // глаза следят за курсором (на всех устройствах с мышью)
   useEffect(() => {
-    if (isMobile()) return // на мобильных устройствах нет мыши — экономим обработку pointermove
+    if (typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches && !window.matchMedia('(pointer: fine)').matches) {
+      return
+    }
     // не чаще раза за кадр; позицию капли кешируем (сбрасываем на ресайз), чтобы не дёргать layout
     let r = null, rt = 0, raf = 0, px = 0, py = 0
     const upd = () => {
-      raf = 0; const el = launcher.current; if (!el) return
+      raf = 0
       const now = performance.now()
-      if (!r || !r.width || now - rt > 1000) { r = el.getBoundingClientRect(); rt = now }
-      const dx = px - (r.left + r.width / 2), dy = py - (r.top + r.height / 2)
-      const d = Math.hypot(dx, dy) || 1, k = Math.min(1, d / 300)
-      el.style.setProperty('--lx', `${(dx / d) * 3.4 * k}px`); el.style.setProperty('--ly', `${(dy / d) * 3 * k}px`)
+
+      // Слежение на кнопке маскота
+      const el = launcher.current
+      if (el) {
+        if (!r || !r.width || now - rt > 1000) { r = el.getBoundingClientRect(); rt = now }
+        const dx = px - (r.left + r.width / 2), dy = py - (r.top + r.height / 2)
+        const d = Math.hypot(dx, dy) || 1
+        const shift = Math.min(6.5, Math.max(2, (d / 90) * 6.5))
+        el.style.setProperty('--lx', `${(dx / d) * shift}px`)
+        el.style.setProperty('--ly', `${(dy / d) * shift}px`)
+      }
+
+      // Слежение на аватарке в открытом чате
+      const ava = avaRef.current
+      if (ava) {
+        const ar = ava.getBoundingClientRect()
+        const adx = px - (ar.left + ar.width / 2), ady = py - (ar.top + ar.height / 2)
+        const ad = Math.hypot(adx, ady) || 1
+        const ashift = Math.min(6.5, Math.max(2, (ad / 90) * 6.5))
+        ava.style.setProperty('--lx', `${(adx / ad) * ashift}px`)
+        ava.style.setProperty('--ly', `${(ady / ad) * ashift}px`)
+      }
     }
     const mv = (e) => { px = e.clientX; py = e.clientY; if (!raf) raf = requestAnimationFrame(upd) }
     const rs = () => { r = null }
@@ -339,16 +359,16 @@ export default function Mascot({ open, setOpen, prefill, chapterId, onGoWorks })
 
     setHistory((h) => [...h, { step, lead: { ...leadRef.current }, msgsLength: msgs.length }])
 
-    // Микро-эмоции при ответах
-    if (step === 'budget' && (v.includes('150 000') || v.includes('120 000') || v.includes('80–150') || v.includes('60–120'))) {
-      setMood('excited')
-    } else {
-      setMood('happy')
-    }
+    // Заметная анимационная реакция Капли
+    const isBig = step === 'budget' && (v.includes('150 000') || v.includes('120 000') || v.includes('80–150') || v.includes('60–120'))
+    setMood(isBig ? 'excited' : 'happy')
 
     setMsgs((m) => [...m, { from: 'me', text: v }]); setText('')
     const val = s.field === 'type' ? (TYPE_NAME[v] || v) : v
     const l = { ...leadRef.current, [s.field]: val }; setLead(l); leadRef.current = l
+    
+    // Даём 450мс отчетливо увидеть радость/восторг Капли до начала печатания
+    await sleep(450)
     goStep(s.next, l)
   }
 
@@ -416,7 +436,7 @@ export default function Mascot({ open, setOpen, prefill, chapterId, onGoWorks })
               </svg>
             </button>
           )}
-          <span className="chat-ava"><Drop mood={mood} /></span>
+          <span className="chat-ava" ref={avaRef}><Drop mood={mood} /></span>
           <div className="chat-head-info">
             <b>{M.name} · ассистент {profile.name}</b>
             <small><i />{typing ? 'печатает…' : 'онлайн · ответ в течение дня'}</small>
