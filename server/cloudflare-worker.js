@@ -24,8 +24,8 @@ const DEFAULT_CHAT_IDS = '1031568361, 1264265361'
 
 const ADMIN_KEYBOARD = {
   keyboard: [
-    [{ text: '📊 CRM' }, { text: '🟡 В работе' }, { text: '📩 Новые' }],
-    [{ text: '➕ Добавить сделку' }, { text: '💰 Финансы' }, { text: '🔍 Поиск' }],
+    [{ text: '🟡 В работе' }, { text: '📩 Новые заявки' }],
+    [{ text: '💰 Финансы' }, { text: '➕ Создать сделку' }, { text: '🔍 Поиск' }],
   ],
   resize_keyboard: true,
   is_persistent: true,
@@ -408,14 +408,12 @@ function renderLeadCard(lead) {
     wa = digits
   }
 
-  const assigneeBadge = lead.assignee
-    ? `📌 <b>Ответственный:</b> <b>${esc(lead.assignee)}</b>`
-    : `📌 <b>Ответственный:</b> <i>Не назначен</i>`
+  const assigneeStr = lead.assignee ? `👤 <b>${esc(lead.assignee)}</b>` : '<i>Не назначен</i>'
 
-  const recentNotes = (lead.notes || []).slice(-6)
-  const notesCountBadge = (lead.notes && lead.notes.length > 6) ? ` (последние 6 из ${lead.notes.length})` : ''
+  const recentNotes = (lead.notes || []).slice(-4)
+  const notesCountBadge = (lead.notes && lead.notes.length > 4) ? ` (${lead.notes.length})` : ''
   const notesText = recentNotes.length
-    ? `\n📝 <b>Заметки по проекту${notesCountBadge}:</b>\n` + recentNotes.map((n) => `• <i>[${formatDate(n.createdAt)} • ${esc(n.author)}]</i> ${esc(n.text)}`).join('\n')
+    ? `\n📝 <b>Заметки${notesCountBadge}:</b>\n` + recentNotes.map((n) => `• <i>[${formatDate(n.createdAt)} • ${esc(n.author)}]</i> ${esc(n.text)}`).join('\n')
     : ''
 
   const budgetNum = parseAmount(lead.budget)
@@ -425,79 +423,61 @@ function renderLeadCard(lead) {
   } else if (lead.paymentStatus === 'prepay_50') {
     const half = Math.round(budgetNum / 2)
     const remain = budgetNum - half
-    paymentBadge = `💳 <b>Оплата:</b> 💳 <b>Аванс 50% внесён</b> (${formatRubles(half)})\n⏳ <b>Остаток к доплате:</b> <b>${formatRubles(remain)}</b>`
+    paymentBadge = `💳 <b>Оплата:</b> 💳 <b>Аванс 50%</b> (${formatRubles(half)})\n⏳ <b>Остаток:</b> <b>${formatRubles(remain)}</b>`
   } else {
     paymentBadge = `💳 <b>Оплата:</b> ⏳ <b>Ожидает аванс</b>`
   }
 
   const text = [
-    `📁 <b>Карточка проекта: ${esc(lead.name)}</b>`,
-    `Статус: <b>${statusBadge(lead.status)}</b>`,
-    assigneeBadge,
+    `📁 <b>${esc(lead.name)}</b> • ${esc(lead.type || 'Проект')}${lead.ref ? ` («${esc(lead.ref)}»)` : ''}`,
+    `Статус: <b>${statusBadge(lead.status)}</b> • ${assigneeStr}`,
     '',
-    `👤 <b>Клиент:</b> ${esc(lead.name)}`,
-    `📬 <b>Контакт:</b> <code>${esc(lead.contact)}</code>`,
-    `🧩 <b>Тип проекта:</b> ${esc(lead.type || 'Не указан')}${lead.ref ? ` (как «${esc(lead.ref)}»)` : ''}`,
-    `📝 <b>Задача:</b>\n${esc(lead.task)}`,
-    '',
+    `📬 <b>Связь:</b> <code>${esc(lead.contact)}</code>`,
     `💰 <b>Бюджет:</b> <b>${esc(lead.budget || 'По договорённости')}</b>`,
     paymentBadge,
     `⏰ <b>Сроки:</b> ${esc(lead.deadline || 'По графику')}`,
-    `📅 <b>Создан:</b> ${formatDate(lead.createdAt)}`,
-    lead.updatedBy ? `🔄 <b>Обновил:</b> ${esc(lead.updatedBy)} (${formatDate(lead.updatedAt)})` : '',
-    notesText,
     '',
-    '⚡ <b>Управление проектом:</b>',
+    `📝 <b>Задача:</b>\n${esc(lead.task)}`,
+    '',
+    `⏱ <i>Создан: ${formatDate(lead.createdAt)}</i>`,
+    notesText,
   ].filter(Boolean).join('\n')
 
   const buttons = []
+
+  // Ряд 1: Быстрая связь с клиентом в 1 клик
   const quickRow = []
   if (tg) quickRow.push({ text: `✍️ Написать @${tg}`, url: `https://t.me/${tg}` })
   if (wa) quickRow.push({ text: '💬 WhatsApp', url: `https://wa.me/${wa}` })
   if (quickRow.length) buttons.push(quickRow)
 
-  // Ответственный и Заметка
+  // Ряд 2: Командная работа (Кто ведёт + Заметка)
   buttons.push([
     { text: lead.assignee ? `👤 Ведёт: ${lead.assignee}` : '👤 Взять себе', callback_data: `crm:assign:${lead.id}` },
     { text: '📝 Заметка', callback_data: `crm:note:${lead.id}` },
   ])
 
-  // Кнопки управления оплатой
+  // Ряд 3: Умная кнопка оплаты в 1 шаг + Сдача проекта
+  let payButton
   if (lead.paymentStatus === 'paid_100') {
-    buttons.push([
-      { text: '💳 Перевести в аванс 50%', callback_data: `crm:pay:${lead.id}:50` },
-      { text: '🔄 Сбросить оплату', callback_data: `crm:pay:${lead.id}:0` },
-    ])
+    payButton = { text: '✅ Оплачен 100% (сброс 🔄)', callback_data: `crm:pay:${lead.id}:0` }
   } else if (lead.paymentStatus === 'prepay_50') {
-    buttons.push([
-      { text: '✅ Оплачен 100%', callback_data: `crm:pay:${lead.id}:100` },
-      { text: '🔄 Сбросить оплату', callback_data: `crm:pay:${lead.id}:0` },
-    ])
+    payButton = { text: '✅ Доплата 100%', callback_data: `crm:pay:${lead.id}:100` }
   } else {
-    buttons.push([
-      { text: '💳 Внесён аванс 50%', callback_data: `crm:pay:${lead.id}:50` },
-      { text: '✅ Оплачен 100%', callback_data: `crm:pay:${lead.id}:100` },
-    ])
+    payButton = { text: '💳 Внести аванс 50%', callback_data: `crm:pay:${lead.id}:50` }
   }
 
-  const statusRow = []
-  if (lead.status !== 'in_progress') {
-    statusRow.push({ text: '🟡 В работу', callback_data: `crm:status:${lead.id}:in_progress` })
-  }
-  if (lead.status !== 'done') {
-    statusRow.push({ text: '🟢 Сдан', callback_data: `crm:status:${lead.id}:done` })
-  }
-  if (lead.status !== 'archived') {
-    statusRow.push({ text: '⚪ В архив', callback_data: `crm:status:${lead.id}:archived` })
-  }
-  if (statusRow.length) buttons.push(statusRow)
+  const nextStatusButton = lead.status === 'done'
+    ? { text: '⚪ В архив', callback_data: `crm:status:${lead.id}:archived` }
+    : { text: '🟢 Сдан (завершить)', callback_data: `crm:status:${lead.id}:done` }
 
+  buttons.push([payButton, nextStatusButton])
+
+  // Ряд 4: Дополнительные действия и навигация
   buttons.push([
-    { text: '📋 Копировать бриф', callback_data: `crm:copy:${lead.id}` },
-    { text: '🗑 Удалить сделку', callback_data: `crm:del:${lead.id}` },
-  ])
-  buttons.push([
-    { text: '🔙 Назад в список', callback_data: `crm:list:${lead.status || 'in_progress'}` },
+    { text: '📋 Копировать', callback_data: `crm:copy:${lead.id}` },
+    { text: '🗑 Удалить', callback_data: `crm:del:${lead.id}` },
+    { text: '🔙 Назад', callback_data: `crm:list:${lead.status || 'in_progress'}` },
   ])
 
   return { text, reply_markup: { inline_keyboard: buttons } }
@@ -793,18 +773,13 @@ export default {
             const currentRows = msg.reply_markup?.inline_keyboard || []
             const linkRow = currentRows.find((r) => r.some((b) => b.url))
             const newKeyboard = [
-              ...(linkRow ? [linkRow] : []),
               [
+                ...(linkRow ? linkRow : []),
                 { text: `👤 Ведёт: ${fromUser}`, callback_data: `crm:assign:${lead?.id || 'lead'}` },
-                { text: '🟡 В работу', callback_data: `crm:status:${lead?.id || 'lead'}:in_progress` },
               ],
               [
-                { text: '🟢 Сдан', callback_data: `crm:status:${lead?.id || 'lead'}:done` },
-                { text: '⚪ В архив', callback_data: `crm:status:${lead?.id || 'lead'}:archived` },
-              ],
-              [
-                { text: '📁 Открыть в CRM', callback_data: `crm:view:${lead?.id || 'lead'}` },
-                { text: '📋 Копировать бриф', callback_data: `crm:copy:${lead?.id || 'lead'}` },
+                { text: '📁 Открыть проект', callback_data: `crm:view:${lead?.id || 'lead'}` },
+                { text: '🟢 Сдан (завершить)', callback_data: `crm:status:${lead?.id || 'lead'}:done` },
               ],
             ]
 
@@ -1245,19 +1220,12 @@ export default {
           const buttons = []
           const qRow = []
           if (tg) qRow.push({ text: `✍️ Написать @${tg}`, url: `https://t.me/${tg}` })
-          if (wa) quickRow.push({ text: '💬 WhatsApp', url: `https://wa.me/${wa}` })
-          if (qRow.length) buttons.push(qRow)
+          if (wa) qRow.push({ text: '💬 WhatsApp', url: `https://wa.me/${wa}` })
+          qRow.push({ text: `👤 Ведёт: ${fromUser}`, callback_data: `crm:assign:${newLead.id}` })
+          buttons.push(qRow)
 
           buttons.push([
-            { text: `👤 Ведёт: ${fromUser}`, callback_data: `crm:assign:${newLead.id}` },
-            { text: '🟡 В работу', callback_data: `crm:status:${newLead.id}:in_progress` },
-          ])
-          buttons.push([
-            { text: '🟢 Сдан', callback_data: `crm:status:${newLead.id}:done` },
-            { text: '⚪ В архив', callback_data: `crm:status:${newLead.id}:archived` },
-          ])
-          buttons.push([
-            { text: '📁 Открыть в CRM', callback_data: `crm:view:${newLead.id}` },
+            { text: '📁 Открыть проект', callback_data: `crm:view:${newLead.id}` },
             { text: '📋 Копировать', callback_data: `crm:copy:${newLead.id}` },
           ])
 
@@ -1280,6 +1248,17 @@ export default {
         // 2.4 Команды нижней клавиатуры
         if (t === '/start' || t === '/admin' || t === '⚡ Меню' || t === '📊 CRM') {
           await setAdminState(env, fromChatId, null)
+          // Закрепляем нижнее меню быстрого доступа
+          await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              chat_id: fromChatId,
+              text: '⚡️ <b>Панель управления Mercury CRM</b>',
+              parse_mode: 'HTML',
+              reply_markup: ADMIN_KEYBOARD,
+            }),
+          })
           const { text, reply_markup } = renderAdminDashboard(leads, hasKV)
           await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
             method: 'POST',
@@ -1342,7 +1321,7 @@ export default {
           return new Response('OK', { headers: cors })
         }
 
-        if (t.includes('Добавить сделку')) {
+        if (t.includes('Добавить сделку') || t.includes('Создать сделку') || t.includes('сделк')) {
           await setAdminState(env, fromChatId, { action: 'add_deal' })
           const prompt = [
             '➕ <b>Создание новой сделки</b>',
@@ -1464,20 +1443,13 @@ export default {
       const buttons = []
       const quickRow = []
       if (tg) quickRow.push({ text: `✍️ Написать @${tg}`, url: `https://t.me/${tg}` })
-      if (wa) quickRow.push({ text: '💬 WhatsApp', url: `https://wa.me/${wa}` })
-      if (quickRow.length) buttons.push(quickRow)
+      else if (wa) quickRow.push({ text: '💬 WhatsApp', url: `https://wa.me/${wa}` })
+      quickRow.push({ text: '👤 Взять себе', callback_data: `crm:assign:${newLead.id}` })
+      buttons.push(quickRow)
 
       buttons.push([
-        { text: '👤 Взять себе', callback_data: `crm:assign:${newLead.id}` },
-        { text: '🟡 В работу', callback_data: `crm:status:${newLead.id}:in_progress` },
-      ])
-      buttons.push([
-        { text: '🟢 Сдан', callback_data: `crm:status:${newLead.id}:done` },
-        { text: '⚪ В архив', callback_data: `crm:status:${newLead.id}:archived` },
-      ])
-      buttons.push([
-        { text: '📁 Открыть в CRM', callback_data: `crm:view:${newLead.id}` },
-        { text: '📋 Копировать бриф', callback_data: `crm:copy:${newLead.id}` },
+        { text: '📁 Открыть проект', callback_data: `crm:view:${newLead.id}` },
+        { text: '📋 Копировать', callback_data: `crm:copy:${newLead.id}` },
       ])
 
       const sendTasks = chatIds.map((id) =>
