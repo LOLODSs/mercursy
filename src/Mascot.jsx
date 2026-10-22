@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState, useCallback } from 'react'
 import { mascot as M, profile, site } from './config.js'
 import { useFocusTrap } from './a11y.js'
 import { isMobile } from './mq.js'
+import { playWaterDrop } from './audio.js'
 
 /* ===== Капля — маскот-ассистент. Собирает бриф и шлёт тебе в Telegram (через M.endpoint) ===== */
 
@@ -87,6 +88,24 @@ export default function Mascot({ open, setOpen, prefill, chapterId, onGoWorks })
   const [unread, setUnread] = useState(false)
   const [mood, setMood] = useState('idle')
   const [launcherMood, setLauncherMood] = useState('idle')
+  const [soundMuted, setSoundMuted] = useState(() => {
+    try {
+      return localStorage.getItem('mercury_sound_muted') === 'true'
+    } catch {
+      return false
+    }
+  })
+
+  const toggleSound = () => {
+    setSoundMuted((prev) => {
+      const next = !prev
+      try {
+        localStorage.setItem('mercury_sound_muted', next ? 'true' : 'false')
+      } catch {}
+      if (!next) playWaterDrop('bloop', false)
+      return next
+    })
+  }
   const [sent, setSent] = useState(null)
   const [history, setHistory] = useState([])
   const started = useRef(false), seen = useRef(new Set()), body = useRef(null), panel = useRef(null), launcher = useRef(null), hp = useRef(null), inputRef = useRef(null)
@@ -127,6 +146,7 @@ export default function Mascot({ open, setOpen, prefill, chapterId, onGoWorks })
 
   const goBack = useCallback(() => {
     if (!history.length || typing) return
+    playWaterDrop('pop', soundMuted)
     setMood('wink')
     const prev = history[history.length - 1]
     setHistory((h) => h.slice(0, -1))
@@ -216,6 +236,7 @@ export default function Mascot({ open, setOpen, prefill, chapterId, onGoWorks })
     const s = STEPS[step]; if (!s) return
     v = v.trim(); if (!v) return
     if (v === '← Назад' || v === '← Изменить (Назад)') return goBack()
+    playWaterDrop('bloop', soundMuted)
     if (FAQ_Q.includes(v)) {
       setMsgs((m) => [...m, { from: 'me', text: v }]); const cur = step; setStep(null)
       await say([M.faq.find((f) => f.q === v).a]); setStep(cur); return
@@ -268,7 +289,10 @@ export default function Mascot({ open, setOpen, prefill, chapterId, onGoWorks })
 
     await sleep(600); setTyping(false)
     setSent(res)
-    if (res === 'ok') { await say(['Готово! 🚀 Заявка уже в Telegram у ' + profile.name + '.', 'Ответ — в течение дня. А пока можно посмотреть работы.'], 'happy') }
+    if (res === 'ok') {
+      playWaterDrop('success', soundMuted)
+      await say(['Готово! 🚀 Заявка уже в Telegram у ' + profile.name + '.', 'Ответ — в течение дня. А пока можно посмотреть работы.'], 'happy')
+    }
     else if (res === 'demo') { await say(['Демо-режим: Telegram-бот ещё не подключён (см. README).', { text: 'Вот так заявка придёт тебе в Telegram 👇', preview: payload }], 'happy') }
     else { await say(['Не получилось отправить 😢 Напиши напрямую — бриф я уже скопировала.'], 'sad'); copyBrief(payload) }
     setStep('after')
@@ -281,7 +305,10 @@ export default function Mascot({ open, setOpen, prefill, chapterId, onGoWorks })
 
   return (
     <>
-      <button ref={launcher} className={`mascot ${open ? 'is-open' : ''} mood-${launcherMood}`} onClick={() => setOpen(!open)}
+      <button ref={launcher} className={`mascot ${open ? 'is-open' : ''} mood-${launcherMood}`} onClick={() => {
+        if (!open) playWaterDrop('bloop', soundMuted)
+        setOpen(!open)
+      }}
         aria-label={open ? 'Закрыть чат с Каплей' : 'Открыть чат: оставить заявку'} aria-expanded={open} data-cursor={open ? 'закрыть' : 'бриф'}>
         <Drop mood={open ? 'happy' : launcherMood} />
         {unread && !open && <span className="mascot-dot" />}
@@ -310,6 +337,27 @@ export default function Mascot({ open, setOpen, prefill, chapterId, onGoWorks })
             <small><i />{typing ? 'печатает…' : 'онлайн · ответ в течение дня'}</small>
           </div>
           <div className="chat-head-actions">
+            <button
+              type="button"
+              className={`chat-sound ${soundMuted ? 'is-muted' : ''}`}
+              onClick={toggleSound}
+              aria-label={soundMuted ? 'Включить звук Капли' : 'Выключить звук Капли'}
+              title={soundMuted ? 'Звук выключен (нажми, чтобы включить)' : 'Звук капли включён (нажми, чтобы выключить)'}
+              data-cursor="звук"
+            >
+              {soundMuted ? (
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                  <line x1="23" y1="9" x2="17" y2="15" />
+                  <line x1="17" y1="9" x2="23" y2="15" />
+                </svg>
+              ) : (
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                  <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
+                </svg>
+              )}
+            </button>
             <a
               className="chat-tg"
               href={profile.telegram}
