@@ -53,7 +53,6 @@ export function Drop({ mood = 'idle', className = '' }) {
 
 const TYPES = ['Хочу сайт', 'Хочу бота', 'Хочу автоматизацию', 'Другое']
 const TYPE_NAME = { 'Хочу сайт': 'Сайт', 'Хочу бота': 'Бот', 'Хочу автоматизацию': 'Автоматизация', 'Другое': 'Другое' }
-const BUDGETS = ['до 30 000 ₽', '30–80 000 ₽', '80–150 000 ₽', '150 000 ₽+', 'Пока не знаю']
 const DEADLINES = ['Срочно (1–3 дня) 🔥', 'До 7 дней', '1–2 недели', 'Не горит']
 const FAQ_Q = M.faq.map((f) => f.q)
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
@@ -71,8 +70,48 @@ const validContact = (v) => {
 const STEPS = {
   type: { field: 'type', ask: () => ['Привет! Я Капля 💧 ассистент ' + profile.name + '.', 'Соберу короткий бриф и сразу передам его в Telegram. Займёт минуту. Что нужно?'], chips: [...TYPES, ...FAQ_Q], next: 'task' },
   task: { field: 'task', input: 'Пара предложений о задаче…', ask: (l) => [l.ref ? `Вижу, нужно что-то вроде «${l.ref}» 👀 Опиши задачу в паре предложений — что должно получиться?` : 'Круто! Опиши задачу в паре предложений — что должно получиться?'], next: 'budget', min: 5 },
-  budget: { field: 'budget', ask: () => ['Какой бюджет примерно? Это нормально, если пока не знаешь.'], chips: BUDGETS, next: 'deadline' },
-  deadline: { field: 'deadline', ask: () => ['Когда нужно запустить?'], chips: DEADLINES, next: 'name' },
+  budget: {
+    field: 'budget',
+    ask: (l) => {
+      const t = (l?.type || '').toLowerCase()
+      if (t.includes('сайт')) {
+        return ['Какой ориентир по бюджету? 💡 Сайты и лендинги у меня обычно от 40 000 ₽. Если пока не уверен — выбери «Пока не знаю», посчитаем точнее.']
+      }
+      if (t.includes('бот')) {
+        return ['Какой ориентир по бюджету? 💡 Telegram-боты обычно от 25 000 ₽ (базовые сценарии от 15 000 ₽). Это нормально, если пока не знаешь.']
+      }
+      if (t.includes('автоматизац')) {
+        return ['Какой ориентир по бюджету? 💡 n8n-автоматизации и интеграции стартуют от 15 000 ₽.']
+      }
+      return ['Какой ориентир по бюджету? 💡 Сайты — от 40 000 ₽, боты — от 25 000 ₽. Это нормально, если пока не знаешь.']
+    },
+    chips: (l) => {
+      const t = (l?.type || '').toLowerCase()
+      if (t.includes('сайт')) {
+        return ['40–80 000 ₽', '80–150 000 ₽', '150 000 ₽+', 'Пока не знаю']
+      }
+      if (t.includes('бот')) {
+        return ['до 30 000 ₽', '30–60 000 ₽', '60–120 000 ₽', '120 000 ₽+', 'Пока не знаю']
+      }
+      if (t.includes('автоматизац')) {
+        return ['до 25 000 ₽', '25–50 000 ₽', '50–100 000 ₽', '100 000 ₽+', 'Пока не знаю']
+      }
+      return ['до 40 000 ₽', '40–80 000 ₽', '80–150 000 ₽', '150 000 ₽+', 'Пока не знаю']
+    },
+    next: 'deadline'
+  },
+  deadline: {
+    field: 'deadline',
+    ask: (l) => {
+      const t = (l?.type || '').toLowerCase()
+      if (t.includes('сайт')) return ['Когда нужно запустить сайт? ⏰ Обычно укладываюсь в 5–8 дней.']
+      if (t.includes('бот')) return ['Когда нужно запустить бота? ⏰ Обычно делаю за 3–6 дней.']
+      if (t.includes('автоматизац')) return ['Когда нужно внедрить автоматизацию? ⏰ Обычно занимает 2–4 дня.']
+      return ['Когда нужно запустить проект? ⏰']
+    },
+    chips: DEADLINES,
+    next: 'name'
+  },
   name: { field: 'name', input: 'Имя', ask: () => ['Как к тебе обращаться?'], next: 'contact', min: 2 },
   contact: { field: 'contact', input: '@ник, телефон или почта', ask: (l) => [`Приятно, ${l.name}! Куда ответить? Telegram (@ник), телефон или почта.`], next: 'confirm', validate: validContact, err: 'Хм, не похоже на контакт. Пример: @ivan, +7 999 123-45-67 или mail@site.ru' },
   confirm: { ask: () => ['Проверь, всё верно? 👇'], chips: ['Отправить ✈', 'Заполнить заново'], summary: true },
@@ -255,7 +294,7 @@ export default function Mascot({ open, setOpen, prefill, chapterId, onGoWorks })
     setHistory((h) => [...h, { step, lead: { ...leadRef.current }, msgsLength: msgs.length }])
 
     // Микро-эмоции при ответах
-    if (step === 'budget' && (v === '150 000 ₽+' || v === '80–150 000 ₽')) {
+    if (step === 'budget' && (v.includes('150 000') || v.includes('120 000') || v.includes('80–150') || v.includes('60–120'))) {
       setMood('excited')
     } else {
       setMood('happy')
@@ -300,7 +339,7 @@ export default function Mascot({ open, setOpen, prefill, chapterId, onGoWorks })
   const copyBrief = (l) => navigator.clipboard?.writeText(briefText(l)).catch(() => {})
 
   const s = STEPS[step]
-  const chips = step === 'after' ? null : s?.chips
+  const chips = step === 'after' ? null : (typeof s?.chips === 'function' ? s.chips(lead) : s?.chips)
   const canType = !!step && step !== 'after' && step !== 'confirm'
 
   return (
