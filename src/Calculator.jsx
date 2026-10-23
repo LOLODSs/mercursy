@@ -80,9 +80,10 @@ export const ICONS = {
   ),
   crm: (
     <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <ellipse cx="12" cy="5" rx="8" ry="3" />
-      <path d="M4 5v6c0 1.66 3.58 3 8 3s8-1.34 8-3V5" />
-      <path d="M4 11v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6" />
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
     </svg>
   ),
   webapp: (
@@ -140,7 +141,7 @@ export const CORE_TYPES = [
     basePrice: 25000,
     baseDays: [2, 4],
     icon: ICONS.automation,
-    desc: 'Связка сервисов, авто-обработка заявок, синхронизация с CRM и базами',
+    desc: 'Связка сервисов, авто-обработка заявок, синхронизация с CRM и сервисами',
   },
 ]
 
@@ -174,11 +175,11 @@ export const OPTIONS = [
   },
   {
     id: 'crm',
-    title: 'CRM и базы данных',
+    title: 'Подключение CRM',
     price: 15000,
     days: 1,
     icon: ICONS.crm,
-    desc: 'AmoCRM, Bitrix24, Notion, PostgreSQL или Telegram-админка',
+    desc: 'AmoCRM, Bitrix24, Google Таблицы, Notion или Telegram-уведомления',
     for: ['website', 'shop', 'bot', 'automation'],
   },
   {
