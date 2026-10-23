@@ -924,7 +924,6 @@ function Contact({ openChat }) {
     { k: 'Email', v: profile.email, href: `mailto:${profile.email}` },
     profile.vk ? { k: 'ВКонтакте', v: profile.vkLabel || 'vk.com/blagamix', href: profile.vk } : null,
     profile.max ? { k: 'MAX', v: profile.maxLabel || 'max.ru', href: profile.max } : null,
-    profile.github ? { k: 'GitHub', v: profile.github.replace('https://', ''), href: profile.github } : null,
   ].filter(Boolean)
   return (
     <>

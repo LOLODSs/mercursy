@@ -21,7 +21,7 @@ export const profile = {
   vkLabel: 'vk.com/blagamix',
   max: 'https://max.ru/u/f9LHodD0cOKZ9w7lYHTEgutigaXYvJiCkeQi9X9592E6KMgdiPZj0XadWSg',
   maxLabel: 'max.ru',
-  github: 'https://github.com/LOLODSs',
+  github: null,
   availability: null,
   photo: null,                               // 🟡 ЗАГЛУШКА — 'media/me.webp', круглое фото в «Обо мне» (живой человек = доверие)
   stats: [                                   // 🟡 ЗАГЛУШКА — только честные цифры, которые подтверждают кейсы
