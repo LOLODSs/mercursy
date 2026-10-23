@@ -12,14 +12,6 @@ export const ICONS = {
       <path d="M16 10a4 4 0 0 1-8 0" />
     </svg>
   ),
-  catalog_sync: (
-    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-      <path d="M3 3v5h5" />
-      <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
-      <path d="M16 16h5v5" />
-    </svg>
-  ),
   multilang: (
     <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <circle cx="12" cy="12" r="10" />
@@ -132,7 +124,7 @@ export const CORE_TYPES = [
     basePrice: 110000,
     baseDays: [10, 14],
     icon: ICONS.shop,
-    desc: 'Каталог товаров, корзина, фильтры, личный кабинет, онлайн-оплата и склад',
+    desc: 'Каталог товаров, умная корзина, фильтры, личный кабинет и онлайн-оплата',
   },
   {
     id: 'bot',
@@ -170,15 +162,6 @@ export const OPTIONS = [
     icon: ICONS.payments,
     desc: 'ЮKassa, Telegram Stars, СБП, Robokassa с чеками (54-ФЗ)',
     for: ['website', 'shop', 'bot'],
-  },
-  {
-    id: 'catalog_sync',
-    title: 'Синхронизация 1С / МойСклад',
-    price: 20000,
-    days: 2,
-    icon: ICONS.catalog_sync,
-    desc: 'Авто-обновление остатков, цен и выгрузка заказов в МойСклад, 1С или CRM',
-    for: ['shop', 'bot'],
   },
   {
     id: 'ai',
@@ -379,7 +362,7 @@ export default function Calculator({ onClose, onOrder }) {
       setSelectedTypes(new Set(['shop', 'bot', 'automation']))
       setSelectedOpts((prev) => {
         const next = new Set(prev)
-        next.add('catalog_sync')
+        next.add('crm')
         next.add('payments')
         return next
       })
@@ -688,7 +671,7 @@ export default function Calculator({ onClose, onOrder }) {
                   data-cursor="комбо"
                   aria-pressed={isShopCombo}
                 >
-                  <span className="calc-preset-name">🛍 E-commerce + Бот + Склад</span>
+                  <span className="calc-preset-name">🛍 E-commerce + Бот + CRM</span>
                   <span className="calc-preset-save">–18 000 ₽</span>
                 </button>
                 <button
