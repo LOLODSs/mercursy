@@ -81,9 +81,16 @@ export default function App() {
   const [leaving, setLeaving] = useState(false)
   const [openCase, setOpenCase] = useState(null)
   const [chat, setChat] = useState({ open: false, prefill: null })
-  const [calcOpen, setCalcOpen] = useState(false)
+  const [calcOpen, setCalcOpen] = useState(() => {
+    return typeof location !== 'undefined' && (location.hash.startsWith('#calc') || new URLSearchParams(location.search).has('calc'))
+  })
   const openCalc = () => setCalcOpen(true)
-  const closeCalc = () => setCalcOpen(false)
+  const closeCalc = () => {
+    setCalcOpen(false)
+    if (location.hash.startsWith('#calc')) {
+      history.replaceState(history.state, '', `#${IDS[chRef.current]}`)
+    }
+  }
   const lock = useRef(false)
   const chRef = useRef(start.current.i)
   const overlay = !!openCase || calcOpen
@@ -122,8 +129,12 @@ export default function App() {
       done = true; pct = 100; setLoadPct(100)
       setTimeout(() => {
         setReady(true)
-        const sl = start.current.slug
-        if (sl) { const i = projects.findIndex((p, k) => slugOf(p, k) === sl); if (i >= 0) setOpenCase({ ...projects[i], idx: i, ox: innerWidth / 2, oy: innerHeight / 2 }) }
+        if (location.hash.startsWith('#calc') || new URLSearchParams(location.search).has('calc')) {
+          setCalcOpen(true)
+        } else {
+          const sl = start.current.slug
+          if (sl) { const i = projects.findIndex((p, k) => slugOf(p, k) === sl); if (i >= 0) setOpenCase({ ...projects[i], idx: i, ox: innerWidth / 2, oy: innerHeight / 2 }) }
+        }
       }, 200)
     })
     return () => { clearInterval(iv); liquid.current?.destroy() }
@@ -163,6 +174,10 @@ export default function App() {
   /* ссылки вида #works и #works/barber-bot, кнопка «назад» */
   useEffect(() => {
     const sync = () => {
+      if (location.hash.startsWith('#calc')) {
+        setCalcOpen(true)
+        return
+      }
       const { i, slug } = parseHash()
       if (!slug) setOpenCase(null)
       else { const k = projects.findIndex((p, n) => slugOf(p, n) === slug); if (k >= 0) setOpenCase((c) => c?.idx === k ? c : { ...projects[k], idx: k, ox: innerWidth / 2, oy: innerHeight / 2 }) }

@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { playWaterDrop } from './audio.js'
 import { useFocusTrap } from './a11y.js'
 import { isMobile } from './mq.js'
+import { profile, site } from './config.js'
 
 export const ICONS = {
   website: (
@@ -87,7 +88,7 @@ export const ICONS = {
   ),
 }
 
-const CORE_TYPES = [
+export const CORE_TYPES = [
   {
     id: 'website',
     name: 'Сайт / Лендинг',
@@ -114,7 +115,7 @@ const CORE_TYPES = [
   },
 ]
 
-const OPTIONS = [
+export const OPTIONS = [
   {
     id: 'graphics3d',
     title: '3D-графика и WebGL',
@@ -181,10 +182,73 @@ const OPTIONS = [
   },
 ]
 
+// Парсер query/hash параметров для инициализации и шер-ссылок
+function parseUrlParams() {
+  if (typeof location === 'undefined') return { types: null, opts: null }
+  try {
+    const rawHash = location.hash.includes('?') ? location.hash.slice(location.hash.indexOf('?') + 1) : ''
+    const params = new URLSearchParams(rawHash || location.search)
+    const typesStr = params.get('types') || params.get('calc')
+    const optsStr = params.get('opts')
+
+    const parsedTypes = typesStr
+      ? typesStr.split(',').map((s) => s.trim()).filter((t) => CORE_TYPES.some((x) => x.id === t))
+      : null
+    const parsedOpts = optsStr
+      ? optsStr.split(',').map((s) => s.trim()).filter((o) => OPTIONS.some((x) => x.id === o))
+      : null
+
+    return {
+      types: parsedTypes && parsedTypes.length > 0 ? new Set(parsedTypes) : null,
+      opts: parsedOpts && parsedOpts.length > 0 ? new Set(parsedOpts) : null,
+    }
+  } catch {
+    return { types: null, opts: null }
+  }
+}
+
+// Копирование в буфер обмена с fallback
+async function copyToClipboard(text) {
+  try {
+    if (navigator?.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text)
+      return true
+    }
+  } catch {}
+  try {
+    const ta = document.createElement('textarea')
+    ta.value = text
+    ta.style.position = 'fixed'
+    ta.style.opacity = '0'
+    document.body.appendChild(ta)
+    ta.focus()
+    ta.select()
+    const ok = document.execCommand('copy')
+    document.body.removeChild(ta)
+    return ok
+  } catch {
+    return false
+  }
+}
+
 export default function Calculator({ onClose, onOrder }) {
+  const initParams = useRef(parseUrlParams()).current
+
   // Выбранные базовые направления (мультиселект: сайт, бот, автоматизация)
-  const [selectedTypes, setSelectedTypes] = useState(new Set(['website']))
-  const [selectedOpts, setSelectedOpts] = useState(new Set())
+  const [selectedTypes, setSelectedTypes] = useState(() => {
+    if (initParams.types) return initParams.types
+    return new Set(['website'])
+  })
+  const [selectedOpts, setSelectedOpts] = useState(() => {
+    if (initParams.opts) return initParams.opts
+    return new Set()
+  })
+
+  const [copied, setCopied] = useState(false)
+  const [linkCopied, setLinkCopied] = useState(false)
+  const [toast, setToast] = useState(null)
+  const toastTimer = useRef(null)
+
   const panelRef = useRef(null)
 
   useFocusTrap(panelRef, true, onClose, { trap: isMobile() })
@@ -206,6 +270,12 @@ export default function Calculator({ onClose, onOrder }) {
   const isMuted = () => {
     try { return localStorage.getItem('mercury_sound_muted') === 'true' } catch { return false }
   }
+
+  const showToast = useCallback((msg) => {
+    if (toastTimer.current) clearTimeout(toastTimer.current)
+    setToast(msg)
+    toastTimer.current = setTimeout(() => setToast(null), 2500)
+  }, [])
 
   const isAllSelected = selectedTypes.has('website') && selectedTypes.has('bot') && selectedTypes.has('automation')
 
@@ -305,6 +375,106 @@ export default function Calculator({ onClose, onOrder }) {
       }
       return next
     })
+  }
+
+  // Генерация актуального URL для шеринга
+  const getShareUrl = useCallback(() => {
+    const isLocal = typeof location !== 'undefined' && (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+    const base = isLocal ? (location.origin + location.pathname) : (site.url || 'https://lolodss.github.io/mercursy')
+    const cleanBase = base.replace(/\/$/, '') + '/'
+    const typesParam = [...selectedTypes].join(',')
+    const optsParam = [...selectedOpts].join(',')
+    let query = `types=${typesParam}`
+    if (optsParam) query += `&opts=${optsParam}`
+    return `${cleanBase}#calc?${query}`
+  }, [selectedTypes, selectedOpts])
+
+  // Генерация отформатированного текста сметы для буфера обмена
+  const getFormattedEstimate = useCallback(() => {
+    const names = []
+    if (selectedTypes.has('website')) names.push('Сайт / Лендинг')
+    if (selectedTypes.has('bot')) names.push('Telegram-бот')
+    if (selectedTypes.has('automation')) names.push('Автоматизация n8n')
+    const typeTitle = names.join(' + ')
+
+    const activeOpts = availableOpts.filter((o) => selectedOpts.has(o.id))
+    const shareUrl = getShareUrl()
+
+    const lines = [
+      '📋 Смета проекта // mercury digital studio',
+      '───────────────────────────────────────',
+      `🛠 Направления: ${typeTitle || 'Сайт'}`,
+    ]
+
+    if (activeOpts.length > 0) {
+      lines.push('⚡ Выбранные опции:')
+      activeOpts.forEach((o) => {
+        const p = o.rate ? `+${Math.round(o.rate * 100)}%` : `+${o.price.toLocaleString('ru-RU')} ₽`
+        lines.push(`   • ${o.title} (${p})`)
+      })
+    } else {
+      lines.push('⚡ Комплектация: Базовая конфигурация')
+    }
+
+    lines.push(`⏱ Ориентировочный срок: ${minDays}–${maxDays} дней`)
+
+    if (comboDiscount > 0) {
+      lines.push(`💰 Бюджет: ~${finalPrice.toLocaleString('ru-RU')} ₽ (включая комбо-скидку –${comboDiscount.toLocaleString('ru-RU')} ₽)`)
+    } else {
+      lines.push(`💰 Бюджет: ~${finalPrice.toLocaleString('ru-RU')} ₽`)
+    }
+
+    lines.push('───────────────────────────────────────')
+    lines.push(`🔗 Открыть этот расчёт онлайн:\n${shareUrl}`)
+    lines.push(`💬 Обсудить в Telegram: ${profile.telegram || 'https://t.me/Xitinchik'}`)
+
+    return lines.join('\n')
+  }, [selectedTypes, availableOpts, selectedOpts, getShareUrl, minDays, maxDays, comboDiscount, finalPrice])
+
+  // 1. Копирование текстовой сметы
+  const handleCopyEstimate = async () => {
+    playWaterDrop('pop', isMuted())
+    const text = getFormattedEstimate()
+    const ok = await copyToClipboard(text)
+    if (ok) {
+      setCopied(true)
+      showToast('Смета скопирована в буфер обмена!')
+      setTimeout(() => setCopied(false), 2500)
+    }
+  }
+
+  // 2. Копирование / шаринг ссылки на смету
+  const handleShareLink = async () => {
+    const url = getShareUrl()
+    const typeNames = []
+    if (selectedTypes.has('website')) typeNames.push('Сайт')
+    if (selectedTypes.has('bot')) typeNames.push('Бот')
+    if (selectedTypes.has('automation')) typeNames.push('n8n')
+
+    // На мобилках при поддержке navigator.share открываем нативный диалог
+    if (isMobile() && typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+      try {
+        playWaterDrop('bloop', isMuted())
+        await navigator.share({
+          title: 'Смета проекта // mercury digital studio',
+          text: `Расчёт: ${typeNames.join(' + ')} (~${finalPrice.toLocaleString('ru-RU')} ₽, ${minDays}–${maxDays} дней)`,
+          url,
+        })
+        showToast('Расчёт отправлен!')
+        return
+      } catch {
+        // Если отменено пользователем — fallback на копирование
+      }
+    }
+
+    // Десктоп или fallback: копируем URL
+    playWaterDrop('bloop', isMuted())
+    const ok = await copyToClipboard(url)
+    if (ok) {
+      setLinkCopied(true)
+      showToast('Ссылка на смету скопирована!')
+      setTimeout(() => setLinkCopied(false), 2500)
+    }
   }
 
   const handleOrder = () => {
@@ -493,7 +663,7 @@ export default function Calculator({ onClose, onOrder }) {
           </section>
         </div>
 
-        {/* Футер с итогом */}
+        {/* Футер с итогом и действиями */}
         <footer className="calc-foot">
           <div className="calc-summary">
             <div className="calc-total">
@@ -518,6 +688,63 @@ export default function Calculator({ onClose, onOrder }) {
           </div>
 
           <div className="calc-actions">
+            <div className="calc-action-aux">
+              <button
+                type="button"
+                className={`btn line calc-btn-aux ${copied ? 'is-copied' : ''}`}
+                onClick={handleCopyEstimate}
+                title="Скопировать структурированную смету со ссылкой в буфер обмена"
+                data-cursor={copied ? 'готово' : 'копия'}
+                aria-label="Скопировать смету в буфер"
+              >
+                {copied ? (
+                  <>
+                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ color: '#7dff9b' }}>
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                    <span>Скопировано!</span>
+                  </>
+                ) : (
+                  <>
+                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                    </svg>
+                    <span>Скопировать смету</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                className={`btn line calc-btn-aux ${linkCopied ? 'is-copied' : ''}`}
+                onClick={handleShareLink}
+                title="Поделиться прямой ссылкой на этот расчёт"
+                data-cursor={linkCopied ? 'готово' : 'ссылка'}
+                aria-label="Поделиться ссылкой на расчёт"
+              >
+                {linkCopied ? (
+                  <>
+                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ color: '#7dff9b' }}>
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                    <span>Ссылка скопирована!</span>
+                  </>
+                ) : (
+                  <>
+                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <circle cx="18" cy="5" r="3" />
+                      <circle cx="6" cy="12" r="3" />
+                      <circle cx="18" cy="19" r="3" />
+                      <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+                      <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+                    </svg>
+                    <span>Поделиться</span>
+                  </>
+                )}
+              </button>
+            </div>
+
             <button
               type="button"
               className="btn chrome calc-order-btn"
@@ -531,6 +758,15 @@ export default function Calculator({ onClose, onOrder }) {
               </svg>
             </button>
           </div>
+
+          {toast && (
+            <div className="calc-toast" role="status" aria-live="polite">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ color: '#7dff9b', flexShrink: 0 }}>
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+              <span>{toast}</span>
+            </div>
+          )}
         </footer>
       </div>
     </div>
