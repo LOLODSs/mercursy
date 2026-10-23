@@ -178,6 +178,7 @@ export default function App() {
         setCalcOpen(true)
         return
       }
+      setCalcOpen(false)
       const { i, slug } = parseHash()
       if (!slug) setOpenCase(null)
       else { const k = projects.findIndex((p, n) => slugOf(p, n) === slug); if (k >= 0) setOpenCase((c) => c?.idx === k ? c : { ...projects[k], idx: k, ox: innerWidth / 2, oy: innerHeight / 2 }) }

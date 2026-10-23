@@ -861,6 +861,32 @@ a{color:inherit}
   .compact-heading{padding-right:128px;min-height:76px}
   .compact-heading .scene-slot{position:absolute;right:0;bottom:0;width:112px;height:72px;margin:0}
 }
+@media (max-height:520px){
+  .calc-backdrop{padding:6px;align-items:center}
+  .calc-panel{width:min(840px,98vw);max-height:98vh;border-radius:18px}
+  .calc-head{padding:10px 18px 8px;gap:8px}
+  .calc-head p{display:none}
+  .calc-badge{margin-bottom:2px;padding:2px 8px;font-size:10px}
+  .calc-head h2{font-size:18px;margin:0;line-height:1.1}
+  .calc-x{width:32px;height:32px}
+  .calc-body{padding:10px 18px;gap:10px}
+  .calc-sec-title{font-size:14px}
+  .calc-types-grid{grid-template-columns:repeat(2,1fr)!important;gap:6px!important}
+  .calc-opts-grid{grid-template-columns:repeat(2,1fr)!important;gap:6px!important}
+  .calc-type-card{padding:10px 12px;border-radius:12px}
+  .calc-opt-card{padding:8px 10px;border-radius:10px}
+  .calc-type-name{font-size:14px}
+  .calc-type-desc,.calc-opt-desc{font-size:11px}
+  .calc-foot{flex-direction:row!important;padding:8px 18px!important;gap:12px!important}
+  .calc-summary{width:auto!important;gap:14px!important}
+  .calc-total-val{font-size:19px!important}
+  .calc-time-val{font-size:13px!important}
+  .calc-actions{flex-direction:row!important;width:auto!important;margin-left:auto!important}
+  .calc-action-aux{display:flex!important;width:auto!important;gap:6px!important}
+  .calc-btn-aux{height:36px;min-height:36px;padding:0 12px;font-size:11.5px}
+  .calc-order-btn{height:36px;min-height:36px;padding:0 14px;font-size:12.5px;width:auto!important}
+  .calc-toast{bottom:60px;right:18px;left:auto}
+}
 .static-drops.bounded .lq{transition:none;transition-delay:0s}
 .static-drops.bounded .lq-m{transform:none!important;transition:none}
 .static-drops.bounded .lq i{animation-name:lqSafeWob}
