@@ -669,7 +669,7 @@ export default function Calculator({ onClose, onOrder }) {
             <div className="calc-total">
               <span className="calc-total-lbl">Ориентир бюджета:</span>
               <div className="calc-total-row">
-                <b className="calc-total-val">~{finalPrice.toLocaleString('ru-RU')} ₽</b>
+                <b className="calc-total-val">~{finalPrice.toLocaleString('ru-RU')}&nbsp;₽</b>
                 {comboDiscount > 0 && (
                   <span className="calc-discount-tag">–{comboDiscount.toLocaleString('ru-RU')} ₽ скидка</span>
                 )}
@@ -682,7 +682,7 @@ export default function Calculator({ onClose, onOrder }) {
                   <circle cx="12" cy="12" r="10" />
                   <polyline points="12 6 12 12 15 14" />
                 </svg>
-                {minDays}–{maxDays} дней
+                {minDays}–{maxDays}&nbsp;дней
               </b>
             </div>
           </div>
@@ -751,7 +751,7 @@ export default function Calculator({ onClose, onOrder }) {
               onClick={handleOrder}
               data-cursor="заказать"
             >
-              <span>Заказать с этим расчётом</span>
+              <span>Оформить заказ</span>
               <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <line x1="5" y1="12" x2="19" y2="12" />
                 <polyline points="12 5 19 12 12 19" />
