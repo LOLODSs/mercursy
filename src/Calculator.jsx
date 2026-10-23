@@ -5,6 +5,35 @@ import { isMobile } from './mq.js'
 import { profile, site } from './config.js'
 
 export const ICONS = {
+  shop: (
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" />
+      <path d="M3 6h18" />
+      <path d="M16 10a4 4 0 0 1-8 0" />
+    </svg>
+  ),
+  catalog_sync: (
+    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+      <path d="M3 3v5h5" />
+      <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
+      <path d="M16 16h5v5" />
+    </svg>
+  ),
+  multilang: (
+    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="10" />
+      <line x1="2" y1="12" x2="22" y2="12" />
+      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+    </svg>
+  ),
+  seo_starter: (
+    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="11" cy="11" r="8" />
+      <line x1="21" y1="21" x2="16.65" y2="16.65" />
+      <path d="m11 8 1.5 3 3 1.5-3 1.5L11 17l-1.5-3-3-1.5 3-1.5L11 8Z" />
+    </svg>
+  ),
   website: (
     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <rect x="2" y="3" width="20" height="18" rx="4" />
@@ -95,7 +124,15 @@ export const CORE_TYPES = [
     basePrice: 60000,
     baseDays: [5, 7],
     icon: ICONS.website,
-    desc: 'Адаптивный сайт с 3D, плавной анимацией и высокой конверсией',
+    desc: 'Адаптивный промо-сайт или лендинг с 3D, плавной анимацией и высокой конверсией',
+  },
+  {
+    id: 'shop',
+    name: 'Интернет-магазин',
+    basePrice: 110000,
+    baseDays: [10, 14],
+    icon: ICONS.shop,
+    desc: 'Каталог товаров, корзина, фильтры, личный кабинет, онлайн-оплата и склад',
   },
   {
     id: 'bot',
@@ -122,8 +159,8 @@ export const OPTIONS = [
     price: 25000,
     days: 2,
     icon: ICONS.graphics3d,
-    desc: 'Интерактивные 3D-модели (Three.js), жидкие эффекты, кастомный курсор',
-    for: ['website'],
+    desc: 'Интерактивные 3D-модели товаров, Three.js, жидкие эффекты, кастомный курсор',
+    for: ['website', 'shop'],
   },
   {
     id: 'payments',
@@ -131,17 +168,26 @@ export const OPTIONS = [
     price: 15000,
     days: 1,
     icon: ICONS.payments,
-    desc: 'ЮKassa, Telegram Stars, СБП, Robokassa с чеками',
-    for: ['website', 'bot'],
+    desc: 'ЮKassa, Telegram Stars, СБП, Robokassa с чеками (54-ФЗ)',
+    for: ['website', 'shop', 'bot'],
+  },
+  {
+    id: 'catalog_sync',
+    title: 'Синхронизация 1С / МойСклад',
+    price: 20000,
+    days: 2,
+    icon: ICONS.catalog_sync,
+    desc: 'Авто-обновление остатков, цен и выгрузка заказов в МойСклад, 1С или CRM',
+    for: ['shop', 'bot'],
   },
   {
     id: 'ai',
-    title: 'AI-ассистент (ChatGPT/Claude)',
+    title: 'AI-ассистент / Консультант',
     price: 20000,
     days: 2,
     icon: ICONS.ai,
-    desc: 'Умный ассистент с обучением на данных твоей компании',
-    for: ['website', 'bot', 'automation'],
+    desc: 'Умный ИИ-ассистент с обучением на данных твоей компании и каталоге',
+    for: ['website', 'shop', 'bot', 'automation'],
   },
   {
     id: 'crm',
@@ -149,8 +195,8 @@ export const OPTIONS = [
     price: 15000,
     days: 1,
     icon: ICONS.crm,
-    desc: 'Google Таблицы, Notion, PostgreSQL или Telegram-админка',
-    for: ['website', 'bot', 'automation'],
+    desc: 'AmoCRM, Bitrix24, Notion, PostgreSQL или Telegram-админка',
+    for: ['website', 'shop', 'bot', 'automation'],
   },
   {
     id: 'webapp',
@@ -158,8 +204,26 @@ export const OPTIONS = [
     price: 25000,
     days: 2,
     icon: ICONS.webapp,
-    desc: 'Интерактивное веб-приложение прямо внутри Telegram',
-    for: ['bot'],
+    desc: 'Полноценный каталог и оформление заказа прямо внутри Telegram',
+    for: ['shop', 'bot'],
+  },
+  {
+    id: 'multilang',
+    title: 'Мультиязычность и валюты',
+    price: 15000,
+    days: 1,
+    icon: ICONS.multilang,
+    desc: 'Переключение языков (RU/EN/UZ/KZ) и мультивалютный расчёт',
+    for: ['website', 'shop'],
+  },
+  {
+    id: 'seo_starter',
+    title: 'SEO-пакет & Скорость 90+',
+    price: 12000,
+    days: 1,
+    icon: ICONS.seo_starter,
+    desc: 'Микроразметка Schema.org, OpenGraph, sitemap, robots и PageSpeed 90+',
+    for: ['website', 'shop'],
   },
   {
     id: 'n8n_addon',
@@ -168,7 +232,7 @@ export const OPTIONS = [
     days: 2,
     icon: ICONS.n8n_addon,
     desc: 'Подключение сценариев n8n, сбор лидов, авто-воронка и вебхуки',
-    for: ['website', 'bot'],
+    for: ['website', 'shop', 'bot'],
     hideIfSelected: 'automation',
   },
   {
@@ -178,7 +242,7 @@ export const OPTIONS = [
     icon: ICONS.urgent,
     badge: '–40% по сроку',
     desc: 'Приоритетная разработка без выходных в сжатые сроки',
-    for: ['website', 'bot', 'automation'],
+    for: ['website', 'shop', 'bot', 'automation'],
   },
 ]
 
@@ -277,7 +341,9 @@ export default function Calculator({ onClose, onOrder }) {
     toastTimer.current = setTimeout(() => setToast(null), 2500)
   }, [])
 
-  const isAllSelected = selectedTypes.has('website') && selectedTypes.has('bot') && selectedTypes.has('automation')
+  const isAllSelected = selectedTypes.size === 4
+  const isShopCombo = selectedTypes.size === 3 && selectedTypes.has('shop') && selectedTypes.has('bot') && selectedTypes.has('automation')
+  const isSiteBotCombo = selectedTypes.size === 2 && selectedTypes.has('website') && selectedTypes.has('bot')
 
   const handleToggleType = (id) => {
     setSelectedTypes((prev) => {
@@ -300,7 +366,33 @@ export default function Calculator({ onClose, onOrder }) {
       setSelectedTypes(new Set(['website']))
       playWaterDrop('pop', isMuted())
     } else {
-      setSelectedTypes(new Set(['website', 'bot', 'automation']))
+      setSelectedTypes(new Set(['website', 'shop', 'bot', 'automation']))
+      playWaterDrop('bloop', isMuted())
+    }
+  }
+
+  const handleSelectShopCombo = () => {
+    if (isShopCombo) {
+      setSelectedTypes(new Set(['shop']))
+      playWaterDrop('pop', isMuted())
+    } else {
+      setSelectedTypes(new Set(['shop', 'bot', 'automation']))
+      setSelectedOpts((prev) => {
+        const next = new Set(prev)
+        next.add('catalog_sync')
+        next.add('payments')
+        return next
+      })
+      playWaterDrop('bloop', isMuted())
+    }
+  }
+
+  const handleSelectSiteBotCombo = () => {
+    if (isSiteBotCombo) {
+      setSelectedTypes(new Set(['website']))
+      playWaterDrop('pop', isMuted())
+    } else {
+      setSelectedTypes(new Set(['website', 'bot']))
       playWaterDrop('bloop', isMuted())
     }
   }
@@ -341,11 +433,14 @@ export default function Calculator({ onClose, onOrder }) {
   let comboDiscount = 0
   let daysScale = 1
   if (selectedTypes.size === 2) {
-    comboDiscount = 7000
-    daysScale = 0.8
-  } else if (selectedTypes.size >= 3) {
-    comboDiscount = 15000
-    daysScale = 0.7
+    comboDiscount = 10000
+    daysScale = 0.85
+  } else if (selectedTypes.size === 3) {
+    comboDiscount = 18000
+    daysScale = 0.75
+  } else if (selectedTypes.size >= 4) {
+    comboDiscount = 25000
+    daysScale = 0.70
   }
 
   let baseSum = Math.max(0, rawBase - comboDiscount)
@@ -393,6 +488,7 @@ export default function Calculator({ onClose, onOrder }) {
   const getFormattedEstimate = useCallback(() => {
     const names = []
     if (selectedTypes.has('website')) names.push('Сайт / Лендинг')
+    if (selectedTypes.has('shop')) names.push('Интернет-магазин')
     if (selectedTypes.has('bot')) names.push('Telegram-бот')
     if (selectedTypes.has('automation')) names.push('Автоматизация n8n')
     const typeTitle = names.join(' + ')
@@ -448,6 +544,7 @@ export default function Calculator({ onClose, onOrder }) {
     const url = getShareUrl()
     const typeNames = []
     if (selectedTypes.has('website')) typeNames.push('Сайт')
+    if (selectedTypes.has('shop')) typeNames.push('Магазин')
     if (selectedTypes.has('bot')) typeNames.push('Бот')
     if (selectedTypes.has('automation')) typeNames.push('n8n')
 
@@ -485,6 +582,7 @@ export default function Calculator({ onClose, onOrder }) {
 
     const names = []
     if (selectedTypes.has('website')) names.push('Сайт')
+    if (selectedTypes.has('shop')) names.push('Интернет-магазин')
     if (selectedTypes.has('bot')) names.push('Telegram-бот')
     if (selectedTypes.has('automation')) names.push('Автоматизация')
     const typeTitle = names.join(' + ')
@@ -537,7 +635,7 @@ export default function Calculator({ onClose, onOrder }) {
             <label className="calc-sec-title">
               <span className="calc-step-num">1</span>
               <span>Что разрабатываем?</span>
-              <small className="calc-sec-sub">Выбирай любые направления — при комбо скидка до 15 000 ₽</small>
+              <small className="calc-sec-sub">Выбирай любые направления — при комбо скидка до 25 000 ₽</small>
             </label>
             <div className="calc-types-grid">
               {CORE_TYPES.map((t) => {
@@ -567,32 +665,43 @@ export default function Calculator({ onClose, onOrder }) {
                   </button>
                 )
               })}
+            </div>
 
-              {/* 4-я карточка: Всё под ключ */}
-              <button
-                type="button"
-                className={`calc-type-card calc-type-card--all ${isAllSelected ? 'is-active' : ''}`}
-                onClick={handleSelectAll}
-                data-cursor="комбо"
-                aria-pressed={isAllSelected}
-              >
-                <div className="calc-card-top">
-                  <span className="calc-type-icon">{ICONS.combo}</span>
-                  <span className="calc-pill-badge" style={{ color: '#ff9ad5', borderColor: 'rgba(255,154,213,.4)', background: 'rgba(255,154,213,.15)' }}>
-                    Выгода 15 000 ₽
-                  </span>
-                  <b className="calc-type-price">от 105 000 ₽</b>
-                  <span className={`calc-checkbox ${isAllSelected ? 'checked' : ''}`} aria-hidden="true">
-                    {isAllSelected && (
-                      <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="3 8 7 12 13 4" />
-                      </svg>
-                    )}
-                  </span>
-                </div>
-                <strong className="calc-type-name">Всё под ключ: Сайт + Бот + n8n</strong>
-                <span className="calc-type-desc">Полная экосистема: сайт привлекает лиды, бот их закрывает, n8n рулит CRM и сценариями</span>
-              </button>
+            {/* Быстрые комбо-пресеты */}
+            <div className="calc-presets-bar">
+              <span className="calc-presets-label">Готовые комбо:</span>
+              <div className="calc-presets-chips">
+                <button
+                  type="button"
+                  className={`calc-preset-chip ${isAllSelected ? 'is-active' : ''}`}
+                  onClick={handleSelectAll}
+                  data-cursor="комбо"
+                  aria-pressed={isAllSelected}
+                >
+                  <span className="calc-preset-name">💎 Всё под ключ (4-в-1)</span>
+                  <span className="calc-preset-save">–25 000 ₽</span>
+                </button>
+                <button
+                  type="button"
+                  className={`calc-preset-chip ${isShopCombo ? 'is-active' : ''}`}
+                  onClick={handleSelectShopCombo}
+                  data-cursor="комбо"
+                  aria-pressed={isShopCombo}
+                >
+                  <span className="calc-preset-name">🛍 E-commerce + Бот + Склад</span>
+                  <span className="calc-preset-save">–18 000 ₽</span>
+                </button>
+                <button
+                  type="button"
+                  className={`calc-preset-chip ${isSiteBotCombo ? 'is-active' : ''}`}
+                  onClick={handleSelectSiteBotCombo}
+                  data-cursor="комбо"
+                  aria-pressed={isSiteBotCombo}
+                >
+                  <span className="calc-preset-name">⚡ Сайт + Бот</span>
+                  <span className="calc-preset-save">–10 000 ₽</span>
+                </button>
+              </div>
             </div>
 
             {/* Плашка активного комбо */}
@@ -603,17 +712,28 @@ export default function Calculator({ onClose, onOrder }) {
                     <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
                   </svg>
                 </span>
-                <span>Выбрано 2 направления — комбо-скидка <b>–7 000 ₽</b> уже учтена в расчёте!</span>
+                <span>Выбрано 2 направления — комбо-скидка <b>–10 000 ₽</b> уже учтена в расчёте!</span>
               </div>
             )}
-            {isAllSelected && (
-              <div className="calc-combo-alert calc-combo-alert--max">
+            {selectedTypes.size === 3 && (
+              <div className="calc-combo-alert calc-combo-alert--mid">
                 <span className="calc-alert-icon" aria-hidden="true">
                   <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="m4.5 16.5-1.5 3 3-1.5M12 15l-3-3m7-7-4 4M21 3l-6 1.5L9 10.5 4 12l8 8 1.5-5 6-6L21 3Z" />
                   </svg>
                 </span>
-                <span>Выбрана полная экосистема — максимальная скидка <b>–15 000 ₽</b> уже учтена в расчёте!</span>
+                <span>Выбрано 3 направления — комбо-скидка <b>–18 000 ₽</b> уже учтена в расчёте!</span>
+              </div>
+            )}
+            {selectedTypes.size >= 4 && (
+              <div className="calc-combo-alert calc-combo-alert--max">
+                <span className="calc-alert-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M6 3h12l4 6-10 12L2 9l4-6Z" />
+                    <path d="M2 9h20" />
+                  </svg>
+                </span>
+                <span>Выбрана полная экосистема из 4 направлений — максимальная скидка <b>–25 000 ₽</b> уже учтена в расчёте!</span>
               </div>
             )}
           </section>
