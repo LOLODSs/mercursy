@@ -270,7 +270,7 @@ export default function App() {
     }
   }, [chat.open])
 
-  const splash = (e) => { if (!e.target.closest('a,button,.reel,.case,.chat,.hscroll,input')) { const l = liquid.current; if (l?.lite) l.setMouse(e.clientX, e.clientY); l?.splash(6) } }
+  const splash = (e) => { if (!e.target.closest('a,button,.reel,.case,.chat,.hscroll,input')) { const l = liquid.current; l?.setMouse?.(e.clientX, e.clientY); l?.splash(6) } }
   const id = IDS[shown]
 
   return (
