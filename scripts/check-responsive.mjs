@@ -47,7 +47,7 @@ try {
       // The last action must be reachable after a native scroll, without changing chapter.
       if (chapter === 'services' && checks.compact) {
         await page.$eval('.chapter', e => { e.scrollTop = e.scrollHeight })
-        const accessible = await page.$eval('.svc-item:last-child button', e => {
+        const accessible = await page.$eval('.svc-calc-cta, .svc-item:last-of-type button', e => {
           const r=e.getBoundingClientRect();return e.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2))
         })
         if (!accessible) errors.push({ width, height, chapter, check: 'last action covered' })
