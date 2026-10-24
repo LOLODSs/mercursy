@@ -9,6 +9,7 @@ import { SceneLayout, mercuryGeometry, constrainBall } from './scene-layout.js'
 const N = 10 // ball 0 = cursor
 const H = 2.4 // half visible height at z=0  (camera z=6, tan = .4)
 const PAD = 0.75 // запас: smin(k=.62) раздувает поле максимум на k/4, плюс рябь .022 и ореол тени md<.4
+const BASE_RADII = new Float32Array([0.62, 0.44, 0.36, 0.3, 0.26, 0.22, 0.19, 0.16, 0.13])
 
 const vert = `attribute vec2 aP; varying vec2 vUv; void main(){ vUv=aP*.5+.5; gl_Position=vec4(aP,0.,1.); }`
 function getFrag(mobile) {
@@ -119,9 +120,9 @@ export class Liquid {
     this.maxQ = this.mobile ? 0.8 : 1.0
     this.quality = this.maxQ
     this.cA = null; this.cB = null; this.cache = new Map(); this.pool = []
-    this.uB = new Float32Array(N * 4)
+    this.uB = new Float32Array(N * 4); this.targetArr = new Float32Array(9 * 4)
     this.chapter = 'home'
-    this.mouse = { x: 0, y: 0, active: false }
+    this.mouse = { cx: innerWidth / 2, cy: innerHeight / 2, active: false }
     this.balls = Array.from({ length: N }, (_, i) => ({ x: (Math.random() - 0.5) * 3, y: H * 1.3 + Math.random() * 0.8, z: 0, r: 0.01, vx: 0, vy: 0, vz: 0, k: 3 + (i % 5) * 0.9, tr: 0.01 }))
     this.trans = null; this.draw = null; this.mix = 0
     this.fr = { n: 0, sum: 0, good: 0, slow: 0, hold: performance.now() + 1500 }
@@ -215,7 +216,10 @@ export class Liquid {
      без билинейного размытия и алиасинга шрифтов). */
   posterScale() {
     const raw = devicePixelRatio || 1
-    return Math.min(raw, this.mobile ? 1.15 : 1.25)
+    let ts = Math.min(raw, this.mobile ? 1.15 : 1.25)
+    const maxDim = Math.max(innerWidth, innerHeight) * ts
+    if (maxDim > 1920) ts = Math.max(0.75, 1920 / Math.max(innerWidth, innerHeight))
+    return ts
   }
   canvasFor() {
     const c = this.pool.pop() || document.createElement('canvas')
@@ -223,7 +227,7 @@ export class Liquid {
     if (c.width !== w || c.height !== h) { c.width = w; c.height = h }
     return c
   }
-  release(c) { if (c && this.pool.length < 1) this.pool.push(c) }
+  release(c) { if (c && this.pool.length < 3) this.pool.push(c) }
   posterCanvas(fn) {
     let c = this.cache.get(fn)
     if (!c) {
@@ -240,15 +244,19 @@ export class Liquid {
   }
   schedule() {
     if (this.idleId) return
-    const run = () => {
+    const run = (deadline) => {
       this.idleId = 0
       if (this.trans) { this.idleId = setTimeout(run, 400); return } // не мешаем переходу
       const fn = (this.want || []).find((f) => f !== this.draw && !this.cache.has(f))
       if (!fn) return
+      if (deadline?.timeRemaining && deadline.timeRemaining() < 8 && !deadline.didTimeout) {
+        this.idleId = window.requestIdleCallback ? requestIdleCallback(run, { timeout: 3000 }) : setTimeout(run, 250)
+        return
+      }
       const c = this.canvasFor(); this.paint(c, fn); this.cache.set(fn, c)
       this.schedule()
     }
-    this.idleId = window.requestIdleCallback ? requestIdleCallback(run, { timeout: 1500 }) : setTimeout(run, 300)
+    this.idleId = window.requestIdleCallback ? requestIdleCallback(run, { timeout: 3000 }) : setTimeout(run, 350)
   }
   repaint() {
     const was = this.mobile; this.mobile = isMobile()
@@ -279,8 +287,9 @@ export class Liquid {
   transitionTo(fn, chapter) {
     if (this.trans) this.finish()
     this.cB = this.posterCanvas(fn); this.upload(1, this.cB)
-    this.trans = { draw: fn, start: performance.now(), dur: this.reduce ? 10 : 1500 }
-    this.fr.hold = performance.now() + 250
+    const dur = this.reduce ? 10 : 1500
+    this.trans = { draw: fn, start: performance.now(), dur }
+    this.fr.hold = performance.now() + dur + 400
     this.chapter = chapter
     this.layout?.setChapter(this.chapter)
     this.splash(this.mobile ? 1.6 : 2.5)
@@ -302,15 +311,8 @@ export class Liquid {
   }
   setMouse(cx, cy) {
     if (this.layout?.current?.bounded && !this.mobile) { this.mouse.active = false; return }
-    const W = H * innerWidth / innerHeight
-    let mx = (cx / innerWidth * 2 - 1) * W
-    let my = -(cy / innerHeight * 2 - 1) * H
-    if (this.mobile) {
-      mx = Math.max(-W * 0.82, Math.min(W * 0.82, mx))
-      my = Math.max(-H * 0.68, Math.min(H * 0.76, my))
-    }
-    this.mouse.x = mx
-    this.mouse.y = my
+    this.mouse.cx = cx
+    this.mouse.cy = cy
     this.mouse.active = true
   }
   setMouseActive(active) {
@@ -318,18 +320,20 @@ export class Liquid {
   }
   splash(power = 5) {
     const p = this.mobile ? Math.min(power, 2.0) : power
-    this.balls.forEach((b, i) => { if (!i) return; const a = Math.random() * 6.283; b.vx += Math.cos(a) * p; b.vy += Math.sin(a) * p; b.vz += (Math.random() - 0.5) * p })
+    for (let i = 1; i < N; i++) {
+      const b = this.balls[i], a = Math.random() * 6.283
+      b.vx += Math.cos(a) * p; b.vy += Math.sin(a) * p; b.vz += (Math.random() - 0.5) * p
+    }
   }
   targets(t) {
     this.shapeScale = 1
     const asp = innerWidth / innerHeight, W = H * asp, m = this.mobile
     const s = m ? 0.62 : Math.min(1, Math.max(0.7, asp / 1.6))
-    const R = [0.62, 0.44, 0.36, 0.3, 0.26, 0.22, 0.19, 0.16, 0.13].map((r) => r * s)
-    const out = []
     const ch = this.chapter
+    const tg = this.targetArr
     for (let i = 0; i < 9; i++) {
       const a = i * 2.4 + t * (0.18 + i * 0.045)
-      let x, y, z = Math.sin(a) * 0.35, r = R[i]
+      let x, y, z = Math.sin(a) * 0.35, r = BASE_RADII[i] * s
       if (ch === 'home') {
         // на телефоне ртуть парит точно по центру в свободном окне между «ЖИВОЕ» и текстом описания
         const cx = m ? 0 : W * 0.4, cy = m ? -H * 0.05 : -H * 0.06
@@ -345,7 +349,7 @@ export class Liquid {
           r = (0.28 + (i % 3) * 0.1) * s * 0.85
         } else {
           if (i < 3) {
-            const lx = [-0.55, -0.18, -0.36][i]
+            const lx = i === 0 ? -0.55 : i === 1 ? -0.18 : -0.36
             x = lx * W + Math.sin(t * 0.35 + i * 2.1) * 0.05 * W
             y = -H * (0.92 + (i % 3) * 0.03) + Math.cos(t * 0.3 + i) * 0.03 * H
             r = 0.3 * (i === 2 ? 0.85 : 1)
@@ -381,14 +385,16 @@ export class Liquid {
         const cx = m ? 0 : W * 0.52, cy = m ? H * 0.26 : H * 0.05
         x = cx + Math.cos(a) * 0.3 * s * (m ? 0.75 : 1); y = cy + Math.sin(a) * 0.26 * s * (m ? 0.65 : 1); r = (0.42 + (i % 3) * 0.1) * s * (m ? 0.48 : 1)
       }
-      out.push([x, y, z, r])
+      const off = i * 4
+      tg[off] = x; tg[off + 1] = y; tg[off + 2] = z; tg[off + 3] = r
     }
-    return out
+    return tg
   }
   // губернатор: окно ~45 кадров (или ~1 с, если кадры совсем медленные). Цель — ровные 60 fps: дольше ~20.5 мс на кадр → снижаем разрешение рендера,
   // стабильно быстрее 17.6 мс → возвращаем (не выше исходного). После просадки потолок временно ниже —
   // чтобы качество не «качалось» туда-сюда. Первые секунды после загрузки/смены главы не считаем.
   govern(dt, now) {
+    if (this.trans) return
     const f = this.fr
     if (now < f.hold) { f.n = 0; f.sum = 0; return }
     f.n++; f.sum += dt
@@ -414,18 +420,37 @@ export class Liquid {
       this.mix = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2
       if (p >= 1) this.finish()
     }
-    const tg = this.targets(t), U = this.uB
-    this.balls.forEach((b, i) => {
+    this.targets(t)
+    const tg = this.targetArr, U = this.uB
+    const m = this.mobile, ch = this.chapter
+    const W = H * innerWidth / innerHeight
+    const maxW = W * 0.82, minY = -H * 0.66, maxY = H * 0.76
+
+    let mx = 0, my = 0
+    if (this.mouse.active) {
+      mx = (this.mouse.cx / innerWidth * 2 - 1) * W
+      my = -(this.mouse.cy / innerHeight * 2 - 1) * H
+      if (m) {
+        mx = Math.max(-maxW, Math.min(maxW, mx))
+        my = Math.max(-H * 0.68, Math.min(H * 0.76, my))
+      }
+    }
+
+    for (let i = 0; i < N; i++) {
+      const b = this.balls[i]
       let tx, ty, tz, tr
       if (i === 0) {
-        if (this.mouse.active) { tx = this.mouse.x; ty = this.mouse.y } else {
+        if (this.mouse.active) {
+          tx = mx; ty = my
+        } else {
           // в простое шар-курсор прилипает к первой капле; на десктопе «Услугах» — внутрь лужи
-          const oy = !this.mobile && this.chapter === 'services' ? -0.15 : (this.mobile ? 0 : 0.5)
-          tx = this.mobile ? tg[0][0] : tg[0][0] - 0.9; ty = tg[0][1] + oy
+          const oy = !m && ch === 'services' ? -0.15 : (m ? 0 : 0.5)
+          tx = m ? tg[0] : tg[0] - 0.9; ty = tg[1] + oy
         }
-        tz = 0.3; tr = (this.chapter === 'contact' ? 0.42 : 0.3) * (this.mobile ? 0.7 : 1)
+        tz = 0.3; tr = (ch === 'contact' ? 0.42 : 0.3) * (m ? 0.7 : 1)
       } else {
-        [tx, ty, tz, tr] = tg[i - 1]
+        const off = (i - 1) * 4
+        tx = tg[off]; ty = tg[off + 1]; tz = tg[off + 2]; tr = tg[off + 3]
       }
       if (this.snapScene) { b.x = tx; b.y = ty; b.z = tz; b.r = tr; b.vx = b.vy = b.vz = 0 }
       const k = i === 0 ? 14 : b.k
@@ -434,21 +459,18 @@ export class Liquid {
       b.vx *= damp; b.vy *= damp; b.vz *= damp
       b.x += b.vx * dt; b.y += b.vy * dt; b.z += b.vz * dt
       b.r += (tr - b.r) * Math.min(1, dt * 3)
-      if (this.mobile) {
-        const W = H * innerWidth / innerHeight
-        const maxW = W * 0.82
-        const minY = -H * 0.66
-        const maxY = H * 0.76
+      if (m) {
         if (b.x < -maxW) { b.x = -maxW; b.vx = Math.abs(b.vx) * 0.25 }
         else if (b.x > maxW) { b.x = maxW; b.vx = -Math.abs(b.vx) * 0.25 }
         if (b.y < minY) { b.y = minY; b.vy = Math.abs(b.vy) * 0.25 }
         else if (b.y > maxY) { b.y = maxY; b.vy = -Math.abs(b.vy) * 0.25 }
       }
-      U[i * 4] = b.x; U[i * 4 + 1] = b.y; U[i * 4 + 2] = b.z; U[i * 4 + 3] = Math.max(0.01, b.r)
-    })
+      const uOff = i * 4
+      U[uOff] = b.x; U[uOff + 1] = b.y; U[uOff + 2] = b.z; U[uOff + 3] = Math.max(0.01, b.r)
+    }
     this.snapScene = false
     const layout = this.layout?.current
-    const isBounded = layout?.bounded && !this.mobile
+    const isBounded = layout?.bounded && !m
     gl.uniform1f(this.L.bounded, isBounded ? 1 : 0); gl.uniform1f(this.L.shape, this.shapeScale || 1)
     if (isBounded) { const c = layout.clip; gl.uniform4f(this.L.safe, c.x / innerWidth, 1 - (c.y + c.height) / innerHeight, (c.x + c.width) / innerWidth, 1 - c.y / innerHeight) }
     else gl.uniform4f(this.L.safe, 0, 0, 1, 1)

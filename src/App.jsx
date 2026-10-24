@@ -107,7 +107,7 @@ export default function App() {
     if (/[?&]debug\b/.test(location.search)) window.__stage = st // для проверки: __stage.quality, __stage.onSlow()
     document.documentElement.classList.toggle('static-mode', !!st.fallback)
     st.onSlow = () => { if (!sessionStorage.getItem('vg-slow')) setSlowAsk(true) }
-    st.chapter = IDS[chRef.current]; st.setPoster(posters[chRef.current]); st.prefetch?.(posters)
+    st.chapter = IDS[chRef.current]; st.setPoster(posters[chRef.current]); st.prefetch?.([posters[chRef.current + 1]])
   }
   const toggleFx = async (on = !fx) => {
     if (fxBusy.current || !liquid.current || (on && !canGL)) return

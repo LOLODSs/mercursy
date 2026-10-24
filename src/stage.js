@@ -74,6 +74,8 @@ class LiteStage {
     this.lq.forEach(d=>d.style.removeProperty('--s'))
     const S = SPOTS[this.chapter] || SPOTS.home
     this.lq.forEach((d, i) => { const [x, y, k] = S[i]; d.style.transform = `translate3d(${x}vw,${y}vh,0) scale(${k})` })
+    const [x0, y0] = S[0]
+    this.lqCenter = { x: (x0 / 100) * innerWidth, y: (y0 / 100) * innerHeight }
   }
   setPoster(fn) { this.layout?.setChapter(this.chapter); this.draw = fn; this.show(fn, true); this.place() }
   transitionTo(fn, id) {
@@ -93,7 +95,8 @@ class LiteStage {
     if (this.mr) return
     this.mr = requestAnimationFrame(() => {
       this.mr = 0
-      const r = this.lq[0].getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2
+      const cx = this.lqCenter ? this.lqCenter.x : (innerWidth * 0.6)
+      const cy = this.lqCenter ? this.lqCenter.y : (innerHeight * 0.25)
       const dx = this.mouse.x - cx, dy = this.mouse.y - cy, d = Math.hypot(dx, dy) || 1, k = Math.min(1, 260 / d) * 0.12
       this.lm.style.transform = `translate3d(${dx * k}px,${dy * k}px,0)`
     })
